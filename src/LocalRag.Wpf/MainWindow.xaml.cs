@@ -1,7 +1,11 @@
 using System.Collections.ObjectModel;
 using System.Windows;
+using System.Windows.Controls;
+using LocalRag.Wpf.Configuration;
 using LocalRag.Wpf.Models;
+using LocalRag.Wpf.Rag;
 using LocalRag.Wpf.Services;
+using LocalRag.Wpf.VectorStore;
 using Forms = System.Windows.Forms;
 
 namespace LocalRag.Wpf;
@@ -10,14 +14,17 @@ public partial class MainWindow : Window
 {
     private const int BenchmarkRuns = 25;
 
-    private readonly LocalRagClient _client = new();
+    private AppSettings _settings = AppSettings.Load();
+    private LocalRagClient _client;
     private readonly RustSidecarClient _rustClient = new();
     private readonly ObservableCollection<SearchResultRow> _results = new();
 
     public MainWindow()
     {
         InitializeComponent();
+        _client = new LocalRagClient(_settings.TurboVec.BaseUrl);
         ResultsDataGrid.ItemsSource = _results;
+        LoadSettingsIntoUi();
         UpdateIngestAvailability();
     }
 
@@ -38,12 +45,6 @@ public partial class MainWindow : Window
 
     private async void StartIngestButton_Click(object sender, RoutedEventArgs e)
     {
-        if (UseRustSidecarCheckBox.IsChecked == true)
-        {
-            SetIngestStatus("Ingest is disabled while Rust sidecar search is enabled.");
-            return;
-        }
-
         if (!TryReadPositiveInt(ChunkSizeTextBox.Text, "chunk size", out var chunkSize) ||
             !TryReadNonNegativeInt(OverlapTextBox.Text, "overlap", out var overlap))
         {
@@ -73,7 +74,7 @@ public partial class MainWindow : Window
         try
         {
             SetIngestBusy(true, "Ingesting documents...");
-            var response = await _client.IngestFolderAsync(request);
+            var response = await IngestWithSelectedProviderAsync(request);
             DocumentsDiscoveredTextBlock.Text = response.DocumentsDiscovered.ToString();
             DocumentsIndexedTextBlock.Text = $"{response.DocumentsIndexed} ({response.DocumentsSkipped} skipped)";
             ChunksIndexedTextBlock.Text = response.ChunksIndexed.ToString();
@@ -112,8 +113,8 @@ public partial class MainWindow : Window
             }
             else
             {
-                SetSearchBusy(true, "Searching...");
-                var response = await _client.SearchAsync(request);
+                SetSearchBusy(true, $"Searching {_settings.VectorStore.Provider}...");
+                var response = await SearchWithSelectedProviderAsync(request);
                 ShowSearchResults(response.Results);
                 LastQueryMsTextBlock.Text = response.ElapsedMilliseconds.ToString("F3");
                 ChunksSearchedTextBlock.Text = response.ChunksSearched.ToString();
@@ -151,8 +152,8 @@ public partial class MainWindow : Window
             }
             else
             {
-                SetSearchBusy(true, "Benchmarking search latency...");
-                var response = await _client.BenchmarkAsync(new BenchmarkRequest(searchRequest.Query, searchRequest.TopK, BenchmarkRuns));
+                SetSearchBusy(true, $"Benchmarking {_settings.VectorStore.Provider} search latency...");
+                var response = await BenchmarkSelectedProviderAsync(searchRequest, BenchmarkRuns);
                 AverageBenchmarkMsTextBlock.Text = response.AverageMilliseconds.ToString("F3");
                 P95BenchmarkMsTextBlock.Text = response.P95Milliseconds.ToString("F3");
                 BenchmarkRunsTextBlock.Text = response.Runs.ToString();
@@ -168,6 +169,58 @@ public partial class MainWindow : Window
         {
             SetSearchBusy(false);
         }
+    }
+
+    private async Task<IngestResponse> IngestWithSelectedProviderAsync(IngestRequest request)
+    {
+        ApplySettingsFromUi();
+        if (_settings.VectorStore.Provider == VectorStoreProviderType.TurboVecSidecar)
+        {
+            return await _client.IngestFolderAsync(request);
+        }
+
+        var provider = VectorStoreProviderFactory.Create(_settings);
+        var databasePath = provider is SqliteVecVectorStoreProvider sqliteVec
+            ? sqliteVec.DatabasePath
+            : _settings.VectorStore.DatabasePath;
+        var service = new LocalDocumentIngestionService(provider, new LocalHashEmbeddingService(_settings.VectorStore.EmbeddingDimensions));
+        return await service.IngestFolderAsync(request, databasePath);
+    }
+
+    private async Task<SearchResponse> SearchWithSelectedProviderAsync(SearchRequest request)
+    {
+        ApplySettingsFromUi();
+        if (_settings.VectorStore.Provider == VectorStoreProviderType.TurboVecSidecar)
+        {
+            return await _client.SearchAsync(request);
+        }
+
+        var provider = VectorStoreProviderFactory.Create(_settings);
+        var service = new RagSearchService(provider, new LocalHashEmbeddingService(_settings.VectorStore.EmbeddingDimensions));
+        return await service.SearchAsync(request);
+    }
+
+    private async Task<BenchmarkResponse> BenchmarkSelectedProviderAsync(SearchRequest request, int runs)
+    {
+        if (_settings.VectorStore.Provider == VectorStoreProviderType.TurboVecSidecar)
+        {
+            return await _client.BenchmarkAsync(new BenchmarkRequest(request.Query, request.TopK, runs));
+        }
+
+        await SearchWithSelectedProviderAsync(request);
+        var timings = new List<double>();
+        var chunksSearched = 0;
+        for (var i = 0; i < runs; i++)
+        {
+            var response = await SearchWithSelectedProviderAsync(request);
+            timings.Add(response.ElapsedMilliseconds);
+            chunksSearched = response.ChunksSearched;
+        }
+
+        timings.Sort();
+        var average = timings.Sum() / timings.Count;
+        var p95Index = Math.Min(timings.Count - 1, (int)Math.Ceiling(timings.Count * 0.95) - 1);
+        return new BenchmarkResponse(average, timings[p95Index], runs, chunksSearched);
     }
 
     private async Task<SearchResponse> SearchRustSidecarAsync(SearchRequest request)
@@ -299,7 +352,7 @@ public partial class MainWindow : Window
 
     private void SetIngestBusy(bool isBusy, string? status = null)
     {
-        StartIngestButton.IsEnabled = !isBusy && UseRustSidecarCheckBox.IsChecked != true;
+        StartIngestButton.IsEnabled = !isBusy;
         IngestBusyIndicator.Visibility = isBusy ? Visibility.Visible : Visibility.Collapsed;
         if (status is not null)
         {
@@ -324,21 +377,113 @@ public partial class MainWindow : Window
     private void UpdateIngestAvailability()
     {
         var useRustSidecar = UseRustSidecarCheckBox.IsChecked == true;
-        FolderPathTextBox.IsEnabled = !useRustSidecar;
-        BrowseButton.IsEnabled = !useRustSidecar;
-        PdfCheckBox.IsEnabled = !useRustSidecar;
-        TxtCheckBox.IsEnabled = !useRustSidecar;
-        MdCheckBox.IsEnabled = !useRustSidecar;
-        DocxCheckBox.IsEnabled = !useRustSidecar;
-        HtmlCheckBox.IsEnabled = !useRustSidecar;
-        ChunkSizeTextBox.IsEnabled = !useRustSidecar;
-        OverlapTextBox.IsEnabled = !useRustSidecar;
-        StartIngestButton.IsEnabled = !useRustSidecar;
         RustCollectionTextBox.IsEnabled = useRustSidecar;
-        SetIngestStatus(useRustSidecar ? "Ingest is disabled while Rust sidecar search is enabled." : "Ready.");
+        SetIngestStatus($"Ready. Active vector store: {_settings.VectorStore.Provider}.");
         SearchStatusTextBlock.Text = useRustSidecar
             ? "Rust sidecar search enabled. Query embeddings still come from the Python sidecar."
-            : "Ready.";
+            : $"Ready. Active vector store: {_settings.VectorStore.Provider}.";
+        UpdateActiveProviderDisplay();
+    }
+
+
+    private void LoadSettingsIntoUi()
+    {
+        foreach (var item in VectorStoreProviderComboBox.Items.OfType<ComboBoxItem>())
+        {
+            if (string.Equals(item.Tag?.ToString(), _settings.VectorStore.Provider.ToString(), StringComparison.OrdinalIgnoreCase))
+            {
+                VectorStoreProviderComboBox.SelectedItem = item;
+                break;
+            }
+        }
+
+        DatabasePathTextBox.Text = _settings.VectorStore.DatabasePath;
+        SqliteVecExtensionPathTextBox.Text = _settings.VectorStore.SqliteVecExtensionPath;
+        EmbeddingDimensionsTextBox.Text = _settings.VectorStore.EmbeddingDimensions.ToString();
+        TurboVecBaseUrlTextBox.Text = _settings.TurboVec.BaseUrl;
+        UpdateActiveProviderDisplay();
+    }
+
+    private void ApplySettingsFromUi()
+    {
+        if (VectorStoreProviderComboBox.SelectedItem is ComboBoxItem item &&
+            Enum.TryParse<VectorStoreProviderType>(item.Tag?.ToString(), out var provider))
+        {
+            _settings.VectorStore.Provider = provider;
+        }
+        else
+        {
+            throw new NotSupportedException("Invalid vector store provider setting.");
+        }
+
+        if (!int.TryParse(EmbeddingDimensionsTextBox.Text, out var dimensions) || dimensions <= 0)
+        {
+            throw new InvalidOperationException("Embedding dimensions must be a positive integer.");
+        }
+
+        _settings.VectorStore.DatabasePath = DatabasePathTextBox.Text.Trim();
+        _settings.VectorStore.SqliteVecExtensionPath = SqliteVecExtensionPathTextBox.Text.Trim();
+        _settings.VectorStore.EmbeddingDimensions = dimensions;
+        _settings.TurboVec.BaseUrl = TurboVecBaseUrlTextBox.Text.Trim();
+        _client = new LocalRagClient(_settings.TurboVec.BaseUrl);
+        UpdateActiveProviderDisplay();
+    }
+
+    private void SaveSettingsButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            ApplySettingsFromUi();
+            _settings.Save();
+            SettingsStatusTextBlock.Text = $"Settings saved to {AppSettings.SettingsPath}.";
+        }
+        catch (Exception ex)
+        {
+            SettingsStatusTextBlock.Text = $"Settings save failed: {ex.Message}";
+        }
+    }
+
+    private async void TestVectorStoreButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            ApplySettingsFromUi();
+            var provider = VectorStoreProviderFactory.Create(_settings);
+            await provider.InitializeAsync();
+            SettingsStatusTextBlock.Text = $"{_settings.VectorStore.Provider} initialized successfully.";
+        }
+        catch (Exception ex)
+        {
+            SettingsStatusTextBlock.Text = $"Provider validation failed: {ex.Message}";
+        }
+    }
+
+    private void VectorStoreProviderComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ActiveProviderTextBlock is null || DatabasePathTextBox is null)
+        {
+            return;
+        }
+
+        try
+        {
+            ApplySettingsFromUi();
+            UpdateIngestAvailability();
+        }
+        catch
+        {
+            UpdateActiveProviderDisplay();
+        }
+    }
+
+    private void UpdateActiveProviderDisplay()
+    {
+        ActiveProviderTextBlock.Text = _settings.VectorStore.Provider switch
+        {
+            VectorStoreProviderType.TurboVecSidecar => "TurboVec Sidecar",
+            VectorStoreProviderType.SqliteVec => "SQLite sqlite-vec",
+            _ => _settings.VectorStore.Provider.ToString()
+        };
     }
 
     private string GetRustCollectionName() => RustCollectionTextBox.Text.Trim();
