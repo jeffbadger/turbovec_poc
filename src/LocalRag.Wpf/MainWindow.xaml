@@ -89,7 +89,7 @@
                         <TextBlock VerticalAlignment="Center" Margin="0,0,8,0" Text="Query:" />
                         <TextBox x:Name="QueryTextBox" Width="420" Margin="0,0,18,0" />
                         <TextBlock VerticalAlignment="Center" Margin="0,0,8,0" Text="TopK:" />
-                        <TextBox x:Name="TopKTextBox" Width="60" Margin="0,0,18,0" Text="10" />
+                        <TextBox x:Name="TopKTextBox" Width="60" Margin="0,0,18,0" />
                         <Button x:Name="SearchButton" Padding="18,5" Margin="0,0,8,0" Click="SearchButton_Click" Content="Search" />
                         <Button x:Name="BenchmarkButton" Padding="18,5" Margin="0,0,18,0" Click="BenchmarkButton_Click" Content="Benchmark" />
                         <CheckBox x:Name="UseRustSidecarCheckBox" VerticalAlignment="Center" Margin="0,0,12,0" Checked="UseRustSidecarCheckBox_Changed" Unchecked="UseRustSidecarCheckBox_Changed" Content="Use Rust sidecar" />

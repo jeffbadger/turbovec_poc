@@ -37,6 +37,9 @@ public sealed class AppSettings
         var json = File.ReadAllText(SettingsPath);
         var settings = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions) ?? new AppSettings();
         settings.NormalizeLegacySettings();
+        settings.VectorStore ??= new VectorStoreSettings();
+        settings.Search ??= new SearchSettings();
+        settings.TurboVec ??= new TurboVecSettings();
         return settings;
     }
 
@@ -103,6 +106,13 @@ public sealed class SearchSettings
 {
     public int CandidateTopK { get; set; } = 8;
     public int FinalTopK { get; set; } = 2;
+}
+
+public sealed class SearchSettings
+{
+    public const int DefaultTopKValue = 2;
+
+    public int DefaultTopK { get; set; } = DefaultTopKValue;
 }
 
 public sealed class TurboVecSettings

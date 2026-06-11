@@ -84,6 +84,32 @@ fn upsert_and_search_orders_by_cosine_score() {
 }
 
 #[test]
+fn search_truncates_results_to_top_k() {
+    let engine = InMemoryVectorIndexEngine::new("./data");
+    engine
+        .create_collection("top-k".to_string(), 2, DistanceMetric::Cosine)
+        .unwrap();
+    engine
+        .upsert(
+            "top-k",
+            vec![
+                record("a", "doc1", vec![1.0, 0.0], "keep"),
+                record("b", "doc2", vec![0.9, 0.1], "keep"),
+                record("c", "doc3", vec![0.8, 0.2], "keep"),
+            ],
+        )
+        .unwrap();
+
+    let results = engine
+        .search("top-k", vec![1.0, 0.0], 2, None, None)
+        .unwrap();
+
+    assert_eq!(results.results.len(), 2);
+    assert_eq!(results.results[0].id, "a");
+    assert_eq!(results.results[1].id, "b");
+}
+
+#[test]
 fn cosine_similarity_correctness() {
     assert!((cosine_similarity(&[1.0, 1.0], &[1.0, 1.0]) - 1.0).abs() < 0.0001);
     assert!((cosine_similarity(&[1.0, 0.0], &[0.0, 1.0]) - 0.0).abs() < 0.0001);
