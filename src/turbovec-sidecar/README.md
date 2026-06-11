@@ -1,10 +1,10 @@
 # Rust TurboVec Sidecar
 
-Standalone Rust HTTP sidecar for local vector collection storage and cosine-similarity search. This service is isolated from the WPF app and does not require Python, pip, conda, virtual environments, Docker, or administrator rights.
+Standalone Rust HTTP sidecar for local vector collection storage and cosine-similarity search. This service can run by itself, and the WPF app can optionally call it for search/benchmark through the **Use Rust sidecar** toggle. The service does not require Python, pip, conda, virtual environments, Docker, or administrator rights.
 
 ## Related sidecar
 
-The current WPF app still uses the Python FastAPI sidecar at `../python-sidecar`. This Rust service is standalone and intended for future WPF integration.
+The WPF app uses the Python FastAPI sidecar at `../python-sidecar` by default for ingest, embeddings, and search. When **Use Rust sidecar** is enabled, WPF still gets query embeddings from the Python sidecar, then sends vector search requests to this Rust service.
 
 ## Prerequisites
 

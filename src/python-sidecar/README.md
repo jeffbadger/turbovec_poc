@@ -2,10 +2,10 @@
 
 This is the existing Python sidecar used by the current WPF Local RAG POC. It lives under `src/python-sidecar` so both local sidecars are grouped under `src`:
 
-- `src/python-sidecar` — current WPF sidecar for ingest, embeddings, SQLite metadata, and TurboVec search.
-- `src/turbovec-sidecar` — standalone Rust vector-index sidecar for future WPF integration.
+- `src/python-sidecar` — default WPF sidecar for ingest, embeddings, SQLite metadata, and TurboVec search.
+- `src/turbovec-sidecar` — optional Rust vector-index sidecar that WPF can call for search/benchmark.
 
-The WPF app still talks to this Python sidecar at `http://localhost:8008` by default.
+The WPF app talks to this Python sidecar at `http://localhost:8008` by default. When **Use Rust sidecar** is enabled in WPF, this sidecar still provides query embeddings through `/embed`.
 
 ## Prerequisites
 
