@@ -1,0 +1,28 @@
+[package]
+name = "turbovec-sidecar"
+version = "0.1.0"
+edition = "2021"
+description = "Standalone Rust local vector-index sidecar for Local RAG POC"
+license = "MIT"
+
+[features]
+default = []
+turbovec = ["dep:turbovec"]
+
+[dependencies]
+anyhow = "1.0"
+async-trait = "0.1"
+axum = "0.7"
+clap = { version = "4.5", features = ["derive", "env"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+turbovec = { version = "0.9.0", optional = true }
+tokio = { version = "1.40", features = ["macros", "rt-multi-thread", "net", "signal"] }
+tower-http = { version = "0.6", features = ["trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+
+[dev-dependencies]
+tempfile = "3.12"
+tower = { version = "0.5", features = ["util"] }
