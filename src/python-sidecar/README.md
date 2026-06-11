@@ -34,6 +34,10 @@ cd src/python-sidecar
 uvicorn app:app --host 127.0.0.1 --port 8008
 ```
 
+## Ingest without WPF
+
+You can ingest and search without opening the WPF app by calling this sidecar's HTTP endpoints directly. See `../../docs/python-sidecar-usage.md` for curl and PowerShell examples.
+
 ## Health check
 
 ```bash

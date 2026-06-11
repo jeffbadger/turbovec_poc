@@ -53,6 +53,7 @@ src/
       persistence/
     tests/
 docs/
+  python-sidecar-usage.md
   rust-sidecar-api.md
   rust-sidecar-architecture.md
   turbovec-integration-notes.md
@@ -304,6 +305,7 @@ curl -X DELETE http://127.0.0.1:43187/collections/scenario-001-small
 
 ### Sidecar docs
 
+- Python sidecar usage without WPF: `docs/python-sidecar-usage.md`
 - Rust API contract: `docs/rust-sidecar-api.md`
 - Architecture: `docs/rust-sidecar-architecture.md`
 - TurboVec integration notes: `docs/turbovec-integration-notes.md`
