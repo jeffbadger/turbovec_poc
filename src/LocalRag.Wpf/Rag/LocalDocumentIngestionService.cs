@@ -17,6 +17,7 @@ public sealed class LocalDocumentIngestionService
 
     private readonly IVectorStoreProvider _vectorStoreProvider;
     private readonly BgeEmbeddingService _embeddingService;
+    private readonly RaslDocumentChunker _chunker = RaslDocumentChunkerFactory.Create();
 
     public LocalDocumentIngestionService(IVectorStoreProvider vectorStoreProvider, BgeEmbeddingService embeddingService)
     {
@@ -54,28 +55,20 @@ public sealed class LocalDocumentIngestionService
             }
 
             var text = ExtractText(file);
-            var chunks = ChunkText(text, request.ChunkSize, request.Overlap);
-            if (chunks.Count == 0)
+            var modifiedUtc = new DateTimeOffset(file.LastWriteTimeUtc, TimeSpan.Zero);
+            var hash = await Sha256FileAsync(file.FullName, cancellationToken);
+            var chunkRecords = _chunker.CreateUnembeddedChunks(file.FullName, text, modifiedUtc, hash);
+            if (chunkRecords.Count == 0)
             {
                 skippedDocuments++;
                 continue;
             }
 
-            var modifiedUtc = new DateTimeOffset(file.LastWriteTimeUtc, TimeSpan.Zero);
-            var hash = await Sha256FileAsync(file.FullName, cancellationToken);
-            var documentId = file.FullName;
-            var records = new List<VectorChunkRecord>(chunks.Count);
-            for (var i = 0; i < chunks.Count; i++)
+            var records = new List<VectorChunkRecord>(chunkRecords.Count);
+            foreach (var chunk in chunkRecords)
             {
-                var embedding = await _embeddingService.EmbedDocumentChunkAsync(chunks[i].Text, cancellationToken);
-                records.Add(new VectorChunkRecord(
-                    documentId,
-                    file.FullName,
-                    i,
-                    chunks[i].Text,
-                    embedding,
-                    modifiedUtc,
-                    hash));
+                var embedding = await _embeddingService.EmbedDocumentChunkAsync(chunk.EmbeddingText, cancellationToken);
+                records.Add(chunk with { Embedding = embedding });
             }
 
             await _vectorStoreProvider.UpsertDocumentChunksAsync(records, cancellationToken);

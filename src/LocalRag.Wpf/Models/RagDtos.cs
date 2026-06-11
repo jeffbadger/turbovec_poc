@@ -27,7 +27,14 @@ public sealed record SearchResult(
     double Score,
     string DocumentPath,
     int ChunkIndex,
-    string Text);
+    string Text,
+    string? SourceFile = null,
+    string? SectionTitle = null,
+    string? ChunkKind = null,
+    string? Topic = null,
+    double? Distance = null,
+    double? VectorScore = null,
+    double? RerankedScore = null);
 
 public sealed record BenchmarkRequest(string Query, int TopK, int Runs);
 

@@ -183,7 +183,7 @@ public partial class MainWindow : Window
         var databasePath = provider is SqliteVecVectorStoreProvider sqliteVec
             ? sqliteVec.DatabasePath
             : _settings.VectorStore.DatabasePath;
-        var service = new LocalDocumentIngestionService(provider, new BgeEmbeddingService(_settings.TurboVec));
+        var service = new LocalDocumentIngestionService(provider, new BgeEmbeddingService(_settings.Embedding));
         return await service.IngestFolderAsync(request, databasePath);
     }
 
@@ -196,7 +196,7 @@ public partial class MainWindow : Window
         }
 
         var provider = VectorStoreProviderFactory.Create(_settings);
-        var service = new RagSearchService(provider, new BgeEmbeddingService(_settings.TurboVec));
+        var service = new RagSearchService(provider, new BgeEmbeddingService(_settings.Embedding), _settings.Search);
         return await service.SearchAsync(request);
     }
 
@@ -307,6 +307,11 @@ public partial class MainWindow : Window
                 result.Score,
                 result.DocumentPath,
                 result.ChunkIndex,
+                result.SourceFile ?? System.IO.Path.GetFileName(result.DocumentPath),
+                result.SectionTitle,
+                result.ChunkKind,
+                result.Topic,
+                result.Distance,
                 result.Text,
                 BuildPreview(result.Text)));
         }
@@ -353,7 +358,7 @@ public partial class MainWindow : Window
 
     private void SetIngestBusy(bool isBusy, string? status = null)
     {
-        StartIngestButton.IsEnabled = !isBusy;
+        StartIngestButton.IsEnabled = !isBusy && _settings.Index.Mode != IndexMode.StaticReadOnly;
         IngestBusyIndicator.Visibility = isBusy ? Visibility.Visible : Visibility.Collapsed;
         if (status is not null)
         {
@@ -379,7 +384,7 @@ public partial class MainWindow : Window
     {
         var useRustSidecar = UseRustSidecarCheckBox.IsChecked == true;
         RustCollectionTextBox.IsEnabled = useRustSidecar;
-        SetIngestStatus($"Ready. Active vector store: {_settings.VectorStore.Provider}.");
+        SetIngestStatus(_settings.Index.Mode == IndexMode.StaticReadOnly ? $"Ready. Active vector store: {_settings.VectorStore.Provider}. StaticReadOnly mode disables ingestion." : $"Ready. Active vector store: {_settings.VectorStore.Provider}.");
         SearchStatusTextBlock.Text = useRustSidecar
             ? "Rust sidecar search enabled. Query embeddings still come from the Python sidecar."
             : $"Ready. Active vector store: {_settings.VectorStore.Provider}.";
@@ -401,8 +406,21 @@ public partial class MainWindow : Window
         TopKTextBox.Text = _settings.Search.DefaultTopK.ToString();
         DatabasePathTextBox.Text = _settings.VectorStore.DatabasePath;
         SqliteVecExtensionPathTextBox.Text = _settings.VectorStore.SqliteVecExtensionPath;
-        EmbeddingDimensionsTextBox.Text = _settings.VectorStore.EmbeddingDimensions.ToString();
-        TurboVecBaseUrlTextBox.Text = _settings.TurboVec.BaseUrl;
+        EmbeddingDimensionsTextBox.Text = _settings.Embedding.Dimensions.ToString();
+        TurboVecBaseUrlTextBox.Text = _settings.Embedding.BaseUrl;
+        if (EmbeddingProviderTextBlock is not null) EmbeddingProviderTextBlock.Text = _settings.Embedding.Provider.ToString();
+        if (EmbeddingModelTextBlock is not null) EmbeddingModelTextBlock.Text = _settings.Embedding.ModelId;
+        if (IndexModeComboBox is not null)
+        {
+            foreach (var modeItem in IndexModeComboBox.Items.OfType<ComboBoxItem>())
+            {
+                if (string.Equals(modeItem.Tag?.ToString(), _settings.Index.Mode.ToString(), StringComparison.OrdinalIgnoreCase))
+                {
+                    IndexModeComboBox.SelectedItem = modeItem;
+                    break;
+                }
+            }
+        }
         UpdateActiveProviderDisplay();
     }
 
@@ -435,12 +453,20 @@ public partial class MainWindow : Window
 
         _settings.VectorStore.DatabasePath = DatabasePathTextBox.Text.Trim();
         _settings.VectorStore.SqliteVecExtensionPath = SqliteVecExtensionPathTextBox.Text.Trim();
-        _settings.VectorStore.EmbeddingModelId = BgeEmbeddingService.RequiredModelId;
+        _settings.Embedding.ModelId = BgeEmbeddingService.RequiredModelId;
+        _settings.Embedding.Dimensions = dimensions;
+        _settings.Embedding.Normalize = BgeEmbeddingService.RequiredNormalizeEmbeddings;
         _settings.VectorStore.EmbeddingDimensions = dimensions;
-        _settings.VectorStore.NormalizeEmbeddings = BgeEmbeddingService.RequiredNormalizeEmbeddings;
         _settings.VectorStore.DistanceMetric = BgeEmbeddingService.RequiredDistanceMetric;
-        BgeEmbeddingService.ValidateSettings(_settings.VectorStore);
+        _settings.Embedding.BaseUrl = TurboVecBaseUrlTextBox.Text.Trim();
         _settings.TurboVec.BaseUrl = TurboVecBaseUrlTextBox.Text.Trim();
+        if (IndexModeComboBox?.SelectedItem is ComboBoxItem modeItem && Enum.TryParse<IndexMode>(modeItem.Tag?.ToString(), out var mode))
+        {
+            _settings.Index.Mode = mode;
+            _settings.Index.AllowRuntimeIngestion = mode == IndexMode.Dynamic;
+            _settings.VectorStore.ReadOnly = mode == IndexMode.StaticReadOnly;
+        }
+        BgeEmbeddingService.ValidateSettings(_settings);
         _client = new LocalRagClient(_settings.TurboVec.BaseUrl);
         UpdateActiveProviderDisplay();
     }
@@ -506,5 +532,5 @@ public partial class MainWindow : Window
 
     private void SetIngestStatus(string status) => IngestStatusTextBlock.Text = status;
 
-    private sealed record SearchResultRow(double Score, string DocumentPath, int ChunkIndex, string Text, string Preview);
+    private sealed record SearchResultRow(double Score, string DocumentPath, int ChunkIndex, string SourceFile, string? SectionTitle, string? ChunkKind, string? Topic, double? Distance, string Text, string Preview);
 }

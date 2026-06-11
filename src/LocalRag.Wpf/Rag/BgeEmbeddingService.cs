@@ -1,6 +1,4 @@
 using LocalRag.Wpf.Configuration;
-using LocalRag.Wpf.Models;
-using LocalRag.Wpf.Services;
 
 namespace LocalRag.Wpf.Rag;
 
@@ -11,49 +9,45 @@ public sealed class BgeEmbeddingService
     public const bool RequiredNormalizeEmbeddings = true;
     public const string RequiredDistanceMetric = "cosine";
 
-    private readonly LocalRagClient _client;
+    private readonly IEmbeddingProvider _provider;
+    private readonly EmbeddingSettings _settings;
 
     public BgeEmbeddingService(TurboVecSettings settings)
-        : this(new LocalRagClient(settings.BaseUrl))
+        : this(new EmbeddingSettings { BaseUrl = settings.BaseUrl })
     {
     }
 
-    public BgeEmbeddingService(LocalRagClient client)
+    public BgeEmbeddingService(EmbeddingSettings settings)
     {
-        _client = client;
+        _settings = settings;
+        _provider = new TurboVecSidecarEmbeddingProvider(settings);
     }
 
-    public async Task<float[]> EmbedDocumentChunkAsync(string rawChunkText, CancellationToken cancellationToken = default) =>
-        await EmbedAsync(rawChunkText, applyQueryPrefix: false, cancellationToken);
-
-    public async Task<float[]> EmbedQueryAsync(string query, CancellationToken cancellationToken = default) =>
-        await EmbedAsync(query, applyQueryPrefix: true, cancellationToken);
-
-    private async Task<float[]> EmbedAsync(string text, bool applyQueryPrefix, CancellationToken cancellationToken)
+    public BgeEmbeddingService(IEmbeddingProvider provider, EmbeddingSettings settings)
     {
-        var response = await _client.EmbedAsync(new EmbedRequest(text, applyQueryPrefix), cancellationToken);
-        ValidateMetadata(
-            response.EmbeddingModel,
-            response.VectorDimension,
-            response.NormalizeEmbeddings,
-            response.DistanceMetric);
+        _provider = provider;
+        _settings = settings;
+    }
 
-        if (response.Embedding.Count != RequiredDimensions)
+    public Task<float[]> EmbedDocumentChunkAsync(string rawChunkText, CancellationToken cancellationToken = default) =>
+        _provider.EmbedTextAsync(rawChunkText, cancellationToken);
+
+    public Task<float[]> EmbedQueryAsync(string query, CancellationToken cancellationToken = default) =>
+        _provider.EmbedTextAsync(_settings.BgeQueryPrefix + query, cancellationToken);
+
+    public static void ValidateEmbeddingSettings(EmbeddingSettings settings)
+    {
+        ValidateMetadata(settings.ModelId, settings.Dimensions, settings.Normalize, RequiredDistanceMetric);
+    }
+
+    public static void ValidateSettings(AppSettings settings)
+    {
+        ValidateEmbeddingSettings(settings.Embedding);
+        if (settings.Embedding.Dimensions != settings.VectorStore.EmbeddingDimensions)
         {
             throw new InvalidOperationException(
-                $"Embedding response dimension mismatch: expected {RequiredDimensions}, received {response.Embedding.Count}.");
+                $"Embedding dimensions ({settings.Embedding.Dimensions}) must equal VectorStore.EmbeddingDimensions ({settings.VectorStore.EmbeddingDimensions}).");
         }
-
-        return response.Embedding.ToArray();
-    }
-
-    public static void ValidateSettings(VectorStoreSettings settings)
-    {
-        ValidateMetadata(
-            settings.EmbeddingModelId,
-            settings.EmbeddingDimensions,
-            settings.NormalizeEmbeddings,
-            settings.DistanceMetric);
     }
 
     public static void ValidateMetadata(string modelId, int dimensions, bool normalizeEmbeddings, string distanceMetric)
