@@ -1,0 +1,120 @@
+<Window x:Class="LocalRag.Wpf.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Local RAG POC" Height="760" Width="1120" MinHeight="640" MinWidth="920">
+    <Grid Margin="12">
+        <TabControl>
+            <TabItem Header="Ingest">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,8" Text="Folder path:" />
+                    <TextBox x:Name="FolderPathTextBox" Grid.Row="0" Grid.Column="1" Margin="0,0,8,8" MinWidth="520" />
+                    <Button Grid.Row="0" Grid.Column="2" Margin="0,0,0,8" Padding="14,4" Click="BrowseButton_Click" Content="Browse..." />
+
+                    <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,0,0,10">
+                        <TextBlock VerticalAlignment="Center" Margin="0,0,12,0" Text="File extensions:" />
+                        <CheckBox x:Name="PdfCheckBox" Content="PDF" IsChecked="True" Margin="0,0,14,0" />
+                        <CheckBox x:Name="TxtCheckBox" Content="TXT" IsChecked="True" Margin="0,0,14,0" />
+                        <CheckBox x:Name="MdCheckBox" Content="MD" IsChecked="True" Margin="0,0,14,0" />
+                        <CheckBox x:Name="DocxCheckBox" Content="DOCX" IsChecked="True" Margin="0,0,14,0" />
+                        <CheckBox x:Name="HtmlCheckBox" Content="HTML" IsChecked="True" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,0,0,10">
+                        <TextBlock VerticalAlignment="Center" Margin="0,0,8,0" Text="Chunk size:" />
+                        <TextBox x:Name="ChunkSizeTextBox" Width="80" Margin="0,0,20,0" Text="900" />
+                        <TextBlock VerticalAlignment="Center" Margin="0,0,8,0" Text="Overlap:" />
+                        <TextBox x:Name="OverlapTextBox" Width="80" Margin="0,0,20,0" Text="150" />
+                        <Button x:Name="StartIngestButton" Padding="18,5" Click="StartIngestButton_Click" Content="Start ingest" />
+                        <ProgressBar x:Name="IngestBusyIndicator" Width="160" Height="18" Margin="18,0,0,0" IsIndeterminate="True" Visibility="Collapsed" />
+                    </StackPanel>
+
+                    <TextBlock x:Name="IngestStatusTextBlock" Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,4,0,12" Text="Ready." TextWrapping="Wrap" />
+
+                    <GroupBox Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3" Header="Ingest results">
+                        <Grid Margin="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="210" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Documents discovered:" FontWeight="SemiBold" />
+                            <TextBlock x:Name="DocumentsDiscoveredTextBlock" Grid.Row="0" Grid.Column="1" />
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Documents indexed:" FontWeight="SemiBold" />
+                            <TextBlock x:Name="DocumentsIndexedTextBlock" Grid.Row="1" Grid.Column="1" />
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Chunks indexed:" FontWeight="SemiBold" />
+                            <TextBlock x:Name="ChunksIndexedTextBlock" Grid.Row="2" Grid.Column="1" />
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Elapsed seconds:" FontWeight="SemiBold" />
+                            <TextBlock x:Name="IngestElapsedTextBlock" Grid.Row="3" Grid.Column="1" />
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Index path:" FontWeight="SemiBold" />
+                            <TextBlock x:Name="IndexPathTextBlock" Grid.Row="4" Grid.Column="1" TextWrapping="Wrap" />
+                            <TextBlock Grid.Row="5" Grid.Column="0" Text="Metadata DB path:" FontWeight="SemiBold" />
+                            <TextBlock x:Name="MetadataDbPathTextBlock" Grid.Row="5" Grid.Column="1" TextWrapping="Wrap" />
+                        </Grid>
+                    </GroupBox>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Retrieve / Speed Test">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                        <TextBlock VerticalAlignment="Center" Margin="0,0,8,0" Text="Query:" />
+                        <TextBox x:Name="QueryTextBox" Width="600" Margin="0,0,18,0" />
+                        <TextBlock VerticalAlignment="Center" Margin="0,0,8,0" Text="TopK:" />
+                        <TextBox x:Name="TopKTextBox" Width="60" Margin="0,0,18,0" Text="10" />
+                        <Button x:Name="SearchButton" Padding="18,5" Margin="0,0,8,0" Click="SearchButton_Click" Content="Search" />
+                        <Button x:Name="BenchmarkButton" Padding="18,5" Click="BenchmarkButton_Click" Content="Benchmark" />
+                    </StackPanel>
+                    <TextBlock x:Name="SearchStatusTextBlock" Grid.Row="1" Margin="0,0,0,10" Text="Ready." TextWrapping="Wrap" />
+                    <DataGrid x:Name="ResultsDataGrid" Grid.Row="2" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Score" Binding="{Binding Score, StringFormat=F4}" Width="90" />
+                            <DataGridTextColumn Header="Document path" Binding="{Binding DocumentPath}" Width="2*" />
+                            <DataGridTextColumn Header="Chunk index" Binding="{Binding ChunkIndex}" Width="95" />
+                            <DataGridTextColumn Header="Text preview" Binding="{Binding Preview}" Width="3*" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <GroupBox Grid.Row="3" Header="Latency / status" Margin="0,12,0,0">
+                        <WrapPanel Margin="10">
+                            <TextBlock Margin="0,0,24,0" Text="Last query ms: " FontWeight="SemiBold" />
+                            <TextBlock x:Name="LastQueryMsTextBlock" Margin="-20,0,24,0" />
+                            <TextBlock Margin="0,0,24,0" Text="Average benchmark ms: " FontWeight="SemiBold" />
+                            <TextBlock x:Name="AverageBenchmarkMsTextBlock" Margin="-20,0,24,0" />
+                            <TextBlock Margin="0,0,24,0" Text="P95 benchmark ms: " FontWeight="SemiBold" />
+                            <TextBlock x:Name="P95BenchmarkMsTextBlock" Margin="-20,0,24,0" />
+                            <TextBlock Margin="0,0,24,0" Text="Benchmark runs: " FontWeight="SemiBold" />
+                            <TextBlock x:Name="BenchmarkRunsTextBlock" Margin="-20,0,24,0" />
+                            <TextBlock Margin="0,0,24,0" Text="Chunks searched: " FontWeight="SemiBold" />
+                            <TextBlock x:Name="ChunksSearchedTextBlock" Margin="-20,0,24,0" />
+                        </WrapPanel>
+                    </GroupBox>
+                </Grid>
+            </TabItem>
+        </TabControl>
+    </Grid>
+</Window>
