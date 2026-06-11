@@ -149,6 +149,41 @@ The first ingest/search can take longer because Python packages and the embeddin
 - **First search or ingest is slow**: the embedding model loads lazily and may download on first use.
 - **Port 8008 already in use**: stop the other process using that port, or change both the `uvicorn --port` value and the default URL in `LocalRagClient`.
 
+
+## Embedding model and LM Studio
+
+You do **not** need to serve the embedding model separately for the current POC. The FastAPI sidecar loads the embedding model directly in Python with `sentence-transformers`:
+
+```python
+EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"
+_model = SentenceTransformer(EMBEDDING_MODEL)
+```
+
+That means the runtime flow is:
+
+1. Start the FastAPI sidecar with `uvicorn`.
+2. On the first ingest or search, the sidecar loads/downloads `BAAI/bge-small-en-v1.5`.
+3. The sidecar creates embeddings in-process.
+4. TurboVec stores/searches the vectors.
+5. WPF talks only to the sidecar at `http://localhost:8008`.
+
+### How the sidecar finds the model
+
+The sidecar does not scan `rag_store`, LM Studio, or the WPF project for a model file. It passes the model name string `BAAI/bge-small-en-v1.5` to `SentenceTransformer`. `sentence-transformers` treats that value as a Hugging Face model ID, checks its local model cache, and downloads the model from Hugging Face on first use if it is not already cached.
+
+The model cache is managed by `sentence-transformers`/Hugging Face, not by this repo. If you want to control where the model is cached, set the environment variable before starting `uvicorn`, for example in PowerShell:
+
+```powershell
+$env:SENTENCE_TRANSFORMERS_HOME = "C:\models\sentence-transformers-cache"
+uvicorn app:app --host 127.0.0.1 --port 8008
+```
+
+If the machine cannot access Hugging Face, pre-download the model on a machine with internet access and either copy it into the configured cache directory or change `EMBEDDING_MODEL` in `sidecar/app.py` to a local model folder path.
+
+LM Studio is **not used by this version**. You can keep using LM Studio for chat models, but this POC does not call LM Studio for embeddings or chat.
+
+If you want LM Studio to serve embeddings instead, that is a separate follow-up change: replace the `SentenceTransformer` path in `sidecar/app.py` with HTTP calls to LM Studio's OpenAI-compatible embeddings endpoint, usually something like `http://localhost:1234/v1/embeddings`, and load an embedding-capable model in LM Studio. Make sure the embedding model dimension matches the TurboVec index dimension. This POC currently assumes `384` dimensions, so using a different LM Studio embedding model would also require updating `VECTOR_DIMENSION` and rebuilding the TurboVec index.
+
 ## POC success criteria
 
 - Ingest local documents from the WPF **Ingest** tab.
