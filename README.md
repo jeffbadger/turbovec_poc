@@ -230,3 +230,112 @@ If future TurboVec deletion semantics change or a crash leaves stale vectors in 
 - SQLite stores metadata and chunk text.
 - TurboVec stores/searches vectors.
 - Benchmark runs one warmup search before measuring. The benchmark timings measure TurboVec search latency after query embedding is prepared and do not include embedding model load time.
+
+## Rust vector-index sidecar (standalone, experimental)
+
+This repository now includes an isolated Rust local vector-index sidecar at `src/turbovec-sidecar`. It is intended for a future WPF integration path where the C# app can choose between the existing Python sidecar and this Rust sidecar. The WPF app is not modified to call it yet.
+
+### Prerequisites
+
+- Rust stable.
+- No Python required.
+- No Docker required.
+- No administrator rights required when using the default localhost port.
+
+### Build
+
+```bash
+cd src/turbovec-sidecar
+cargo build
+```
+
+### Run
+
+```bash
+cd src/turbovec-sidecar
+cargo run -- --host 127.0.0.1 --port 43187 --data-dir ./data
+```
+
+Defaults:
+
+- Host: `127.0.0.1`
+- Port: `43187`
+- Base URL: `http://127.0.0.1:43187`
+- Data directory: `./data`
+- Engine: `in-memory`
+
+### Health check
+
+```bash
+curl http://127.0.0.1:43187/health
+```
+
+Expected response:
+
+```json
+{
+  "status": "ok",
+  "version": "0.1.0",
+  "engine": "in-memory",
+  "collections": 0
+}
+```
+
+### Minimal demo
+
+Create a collection:
+
+```bash
+curl -X POST http://127.0.0.1:43187/collections \
+  -H "Content-Type: application/json" \
+  -d '{"name":"scenario-001-small","dimensions":2,"distance":"cosine"}'
+```
+
+Upsert two vectors:
+
+```bash
+curl -X POST http://127.0.0.1:43187/collections/scenario-001-small/upsert \
+  -H "Content-Type: application/json" \
+  -d '{"records":[{"id":"doc1_chunk_0","documentId":"doc1","chunkId":"0","embedding":[1.0,0.0],"text":"first chunk","metadata":{"sourcePath":"documents/doc1.txt","fileName":"doc1.txt"}},{"id":"doc2_chunk_0","documentId":"doc2","chunkId":"0","embedding":[0.0,1.0],"text":"second chunk","metadata":{"sourcePath":"documents/doc2.txt","fileName":"doc2.txt"}}]}'
+```
+
+Search:
+
+```bash
+curl -X POST http://127.0.0.1:43187/collections/scenario-001-small/search \
+  -H "Content-Type: application/json" \
+  -d '{"queryEmbedding":[1.0,0.0],"topK":2,"metadataFilter":null,"allowedDocumentIds":null}'
+```
+
+Get stats:
+
+```bash
+curl http://127.0.0.1:43187/collections/scenario-001-small/stats
+```
+
+Save:
+
+```bash
+curl -X POST http://127.0.0.1:43187/collections/scenario-001-small/save
+```
+
+Load:
+
+```bash
+curl -X POST http://127.0.0.1:43187/collections/scenario-001-small/load
+```
+
+### Known limitations
+
+- The in-memory vector engine is the default.
+- JSON persistence is for POC use only.
+- No authentication yet.
+- No TLS yet.
+- No production index compaction.
+- TurboVec integration is currently a placeholder behind the `turbovec` Cargo feature while the real Rust engine mapping/persistence design is finalized.
+
+Full API and architecture docs:
+
+- `docs/rust-sidecar-api.md`
+- `docs/rust-sidecar-architecture.md`
+- `docs/turbovec-integration-notes.md`
