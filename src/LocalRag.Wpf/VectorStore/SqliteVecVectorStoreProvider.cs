@@ -1,7 +1,9 @@
 using System.Globalization;
 using System.IO;
 using Microsoft.Data.Sqlite;
+using System.Text.RegularExpressions;
 using LocalRag.Wpf.Configuration;
+using LocalRag.Wpf.Rag;
 
 namespace LocalRag.Wpf.VectorStore;
 
@@ -15,10 +17,7 @@ public sealed class SqliteVecVectorStoreProvider : IVectorStoreProvider
     public SqliteVecVectorStoreProvider(VectorStoreSettings settings)
     {
         _settings = settings;
-        if (_settings.EmbeddingDimensions <= 0)
-        {
-            throw new InvalidOperationException("VectorStore:EmbeddingDimensions must be a positive integer.");
-        }
+        BgeEmbeddingService.ValidateSettings(_settings);
 
         _databasePath = VectorStorePathResolver.ResolveDatabasePath(_settings.DatabasePath);
         _extensionPath = VectorStorePathResolver.ResolveExtensionPath(_settings.SqliteVecExtensionPath);
@@ -53,6 +52,8 @@ public sealed class SqliteVecVectorStoreProvider : IVectorStoreProvider
         LoadExtension(connection);
         await VerifyExtensionAsync(connection, cancellationToken);
         await CreateSchemaAsync(connection, cancellationToken);
+        await ValidateVectorTableSchemaAsync(connection, cancellationToken);
+        await ValidateEmbeddingMetadataAsync(connection, cancellationToken);
         _initialized = true;
     }
 
@@ -228,9 +229,73 @@ public sealed class SqliteVecVectorStoreProvider : IVectorStoreProvider
             );
 
             CREATE VIRTUAL TABLE IF NOT EXISTS chunk_vectors
-            USING vec0(embedding float[{_settings.EmbeddingDimensions}]);
+            USING vec0(embedding float[{BgeEmbeddingService.RequiredDimensions}]);
+
+            CREATE TABLE IF NOT EXISTS embedding_metadata (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                embedding_model_id TEXT NOT NULL,
+                embedding_dimensions INTEGER NOT NULL,
+                normalize_embeddings INTEGER NOT NULL CHECK (normalize_embeddings IN (0, 1)),
+                distance_metric TEXT NOT NULL
+            );
             """;
         await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private async Task ValidateVectorTableSchemaAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT sql FROM sqlite_schema WHERE type = 'table' AND name = 'chunk_vectors';";
+        var schema = (string?)await command.ExecuteScalarAsync(cancellationToken)
+            ?? throw new InvalidOperationException("sqlite-vec vector table 'chunk_vectors' was not created.");
+
+        var match = Regex.Match(schema, @"embedding\s+float\[(\d+)\]", RegexOptions.IgnoreCase);
+        if (!match.Success || !int.TryParse(match.Groups[1].Value, CultureInfo.InvariantCulture, out var tableDimensions))
+        {
+            throw new InvalidOperationException("Could not validate sqlite-vec vector table dimension from chunk_vectors schema.");
+        }
+
+        if (tableDimensions != BgeEmbeddingService.RequiredDimensions)
+        {
+            throw new InvalidOperationException(
+                $"sqlite-vec vector table dimension mismatch: chunk_vectors.embedding is float[{tableDimensions}], " +
+                $"but VectorStore:EmbeddingDimensions is {BgeEmbeddingService.RequiredDimensions}. Recreate/reingest the database with float[{BgeEmbeddingService.RequiredDimensions}].");
+        }
+    }
+
+    private async Task ValidateEmbeddingMetadataAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using (var select = connection.CreateCommand())
+        {
+            select.CommandText = """
+                SELECT embedding_model_id, embedding_dimensions, normalize_embeddings, distance_metric
+                FROM embedding_metadata
+                WHERE id = 1;
+                """;
+            await using var reader = await select.ExecuteReaderAsync(cancellationToken);
+            if (await reader.ReadAsync(cancellationToken))
+            {
+                BgeEmbeddingService.ValidateMetadata(
+                    reader.GetString(0),
+                    reader.GetInt32(1),
+                    reader.GetInt32(2) != 0,
+                    reader.GetString(3));
+                return;
+            }
+        }
+
+        await using var insert = connection.CreateCommand();
+        insert.CommandText = """
+            INSERT INTO embedding_metadata(
+                id, embedding_model_id, embedding_dimensions, normalize_embeddings, distance_metric
+            )
+            VALUES (1, $embeddingModelId, $embeddingDimensions, $normalizeEmbeddings, $distanceMetric);
+            """;
+        insert.Parameters.AddWithValue("$embeddingModelId", BgeEmbeddingService.RequiredModelId);
+        insert.Parameters.AddWithValue("$embeddingDimensions", BgeEmbeddingService.RequiredDimensions);
+        insert.Parameters.AddWithValue("$normalizeEmbeddings", BgeEmbeddingService.RequiredNormalizeEmbeddings ? 1 : 0);
+        insert.Parameters.AddWithValue("$distanceMetric", BgeEmbeddingService.RequiredDistanceMetric);
+        await insert.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static async Task UpsertDocumentAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, VectorChunkRecord firstChunk, CancellationToken cancellationToken)
@@ -296,9 +361,9 @@ public sealed class SqliteVecVectorStoreProvider : IVectorStoreProvider
 
     private void ValidateEmbedding(float[] embedding, string label)
     {
-        if (embedding.Length != _settings.EmbeddingDimensions)
+        if (embedding.Length != BgeEmbeddingService.RequiredDimensions)
         {
-            throw new InvalidOperationException($"Embedding dimension mismatch for {label}: expected {_settings.EmbeddingDimensions}, received {embedding.Length}.");
+            throw new InvalidOperationException($"Embedding dimension mismatch for {label}: expected {BgeEmbeddingService.RequiredDimensions}, received {embedding.Length}.");
         }
     }
 

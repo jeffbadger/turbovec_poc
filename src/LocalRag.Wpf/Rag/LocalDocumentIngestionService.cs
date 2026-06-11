@@ -16,9 +16,9 @@ public sealed class LocalDocumentIngestionService
     };
 
     private readonly IVectorStoreProvider _vectorStoreProvider;
-    private readonly LocalHashEmbeddingService _embeddingService;
+    private readonly BgeEmbeddingService _embeddingService;
 
-    public LocalDocumentIngestionService(IVectorStoreProvider vectorStoreProvider, LocalHashEmbeddingService embeddingService)
+    public LocalDocumentIngestionService(IVectorStoreProvider vectorStoreProvider, BgeEmbeddingService embeddingService)
     {
         _vectorStoreProvider = vectorStoreProvider;
         _embeddingService = embeddingService;
@@ -67,7 +67,7 @@ public sealed class LocalDocumentIngestionService
             var records = new List<VectorChunkRecord>(chunks.Count);
             for (var i = 0; i < chunks.Count; i++)
             {
-                var embedding = await _embeddingService.EmbedAsync(chunks[i].Text, cancellationToken);
+                var embedding = await _embeddingService.EmbedDocumentChunkAsync(chunks[i].Text, cancellationToken);
                 records.Add(new VectorChunkRecord(
                     documentId,
                     file.FullName,

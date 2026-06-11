@@ -24,6 +24,9 @@ INDEX_PATH = STORE_DIR / "index.tvim"
 DB_PATH = STORE_DIR / "metadata.db"
 EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"
 VECTOR_DIMENSION = 384
+NORMALIZE_EMBEDDINGS = True
+DISTANCE_METRIC = "cosine"
+QUERY_INSTRUCTION_TEMPLATE = "Represent this sentence for searching relevant passages: {query}"
 BIT_WIDTH = 4
 SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".md", ".docx", ".html", ".htm"}
 
@@ -65,12 +68,17 @@ class SearchRequest(BaseModel):
 
 class EmbedRequest(BaseModel):
     text: str
+    apply_query_prefix: bool = Field(default=True, alias="applyQueryPrefix")
+
+    model_config = {"populate_by_name": True}
 
 
 class EmbedResponse(BaseModel):
     embedding: list[float]
     embedding_model: str = Field(alias="embeddingModel")
     vector_dimension: int = Field(alias="vectorDimension")
+    normalize_embeddings: bool = Field(alias="normalizeEmbeddings")
+    distance_metric: str = Field(alias="distanceMetric")
 
     model_config = {"populate_by_name": True}
 
@@ -118,6 +126,8 @@ class StatsResponse(BaseModel):
     embedding_model: str = Field(alias="embeddingModel")
     vector_dimension: int = Field(alias="vectorDimension")
     bit_width: int = Field(alias="bitWidth")
+    normalize_embeddings: bool = Field(alias="normalizeEmbeddings")
+    distance_metric: str = Field(alias="distanceMetric")
 
     model_config = {"populate_by_name": True}
 
@@ -154,8 +164,54 @@ def init_db() -> None:
                 char_end INTEGER,
                 FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE CASCADE
             );
+
+            CREATE TABLE IF NOT EXISTS embedding_metadata (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                embedding_model_id TEXT NOT NULL,
+                embedding_dimensions INTEGER NOT NULL,
+                normalize_embeddings INTEGER NOT NULL CHECK (normalize_embeddings IN (0, 1)),
+                distance_metric TEXT NOT NULL
+            );
             """
         )
+        validate_embedding_metadata(conn)
+
+
+def validate_embedding_metadata(conn: sqlite3.Connection) -> None:
+    row = conn.execute(
+        """
+        SELECT embedding_model_id, embedding_dimensions, normalize_embeddings, distance_metric
+        FROM embedding_metadata
+        WHERE id = 1
+        """
+    ).fetchone()
+    expected = (EMBEDDING_MODEL, VECTOR_DIMENSION, int(NORMALIZE_EMBEDDINGS), DISTANCE_METRIC)
+    if row is None:
+        conn.execute(
+            """
+            INSERT INTO embedding_metadata(
+                id, embedding_model_id, embedding_dimensions, normalize_embeddings, distance_metric
+            )
+            VALUES (1, ?, ?, ?, ?)
+            """,
+            expected,
+        )
+        return
+
+    actual = (row["embedding_model_id"], row["embedding_dimensions"], row["normalize_embeddings"], row["distance_metric"])
+    if actual != expected:
+        raise RuntimeError(
+            "Embedding metadata mismatch: expected "
+            f"model={EMBEDDING_MODEL}, dimensions={VECTOR_DIMENSION}, "
+            f"normalize_embeddings={NORMALIZE_EMBEDDINGS}, distance_metric={DISTANCE_METRIC}; "
+            f"found model={actual[0]}, dimensions={actual[1]}, "
+            f"normalize_embeddings={bool(actual[2])}, distance_metric={actual[3]}. "
+            "Rebuild/reingest the vector store with the configured embedding model."
+        )
+
+
+def format_query_for_embedding(query: str) -> str:
+    return QUERY_INSTRUCTION_TEMPLATE.format(query=query)
 
 
 def load_or_create_index() -> IdMapIndex:
@@ -253,7 +309,7 @@ def stable_vector_id(path: Path, modified: str, chunk_index: int, chunk: str) ->
 def embed_texts(texts: list[str]) -> np.ndarray:
     if not texts:
         return np.empty((0, VECTOR_DIMENSION), dtype=np.float32)
-    vectors = get_model().encode(texts, normalize_embeddings=True, convert_to_numpy=True, show_progress_bar=False)
+    vectors = get_model().encode(texts, normalize_embeddings=NORMALIZE_EMBEDDINGS, convert_to_numpy=True, show_progress_bar=False)
     return np.asarray(vectors, dtype=np.float32)
 
 
@@ -283,7 +339,7 @@ def perform_search(query: str, top_k: int) -> SearchResponse:
         chunk_count = len(index)
         if chunk_count == 0:
             return SearchResponse(results=[], elapsedMilliseconds=0.0, chunksSearched=0)
-        query_vector = embed_texts([query])
+        query_vector = embed_texts([format_query_for_embedding(query)])
         k = min(top_k, chunk_count)
         start = time.perf_counter()
         scores, ids = index.search(query_vector, k)
@@ -343,6 +399,8 @@ def stats() -> StatsResponse:
         embeddingModel=EMBEDDING_MODEL,
         vectorDimension=VECTOR_DIMENSION,
         bitWidth=BIT_WIDTH,
+        normalizeEmbeddings=NORMALIZE_EMBEDDINGS,
+        distanceMetric=DISTANCE_METRIC,
     )
 
 
@@ -422,11 +480,14 @@ def ingest_folder(request: IngestRequest) -> IngestResponse:
 def embed(request: EmbedRequest) -> EmbedResponse:
     if not request.text.strip():
         raise HTTPException(status_code=400, detail="Text is required.")
-    vector = embed_texts([request.text])[0].astype(float).tolist()
+    input_text = format_query_for_embedding(request.text) if request.apply_query_prefix else request.text
+    vector = embed_texts([input_text])[0].astype(float).tolist()
     return EmbedResponse(
         embedding=vector,
         embeddingModel=EMBEDDING_MODEL,
         vectorDimension=VECTOR_DIMENSION,
+        normalizeEmbeddings=NORMALIZE_EMBEDDINGS,
+        distanceMetric=DISTANCE_METRIC,
     )
 
 
