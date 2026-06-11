@@ -1,5 +1,4 @@
 using LocalRag.Wpf.Configuration;
-using LocalRag.Wpf.Models;
 using LocalRag.Wpf.Services;
 
 namespace LocalRag.Wpf.VectorStore;
@@ -26,7 +25,7 @@ public sealed class TurboVecSidecarProvider : IVectorStoreProvider
     public Task UpsertDocumentChunksAsync(IReadOnlyList<VectorChunkRecord> chunks, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException("TurboVec sidecar ingestion is performed by its existing /ingest-folder HTTP endpoint.");
 
-    public Task<IReadOnlyList<VectorSearchHit>> SearchAsync(float[] queryEmbedding, int topK, CancellationToken cancellationToken = default) =>
+    public Task<IReadOnlyList<VectorSearchHit>> SearchAsync(VectorSearchRequest request, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException("TurboVec sidecar search is performed by its existing /search HTTP endpoint.");
 
     public Task DeleteDocumentAsync(string documentId, CancellationToken cancellationToken = default) =>
@@ -38,7 +37,7 @@ public static class VectorStoreProviderFactory
     public static IVectorStoreProvider Create(AppSettings settings) => settings.VectorStore.Provider switch
     {
         VectorStoreProviderType.TurboVecSidecar => new TurboVecSidecarProvider(settings.TurboVec),
-        VectorStoreProviderType.SqliteVec => new SqliteVecVectorStoreProvider(settings.VectorStore),
+        VectorStoreProviderType.SqliteVec => new SqliteVecVectorStoreProvider(settings),
         _ => throw new NotSupportedException($"Vector store provider '{settings.VectorStore.Provider}' is not supported.")
     };
 }

@@ -56,6 +56,9 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Documents discovered:" FontWeight="SemiBold" />
                             <TextBlock x:Name="DocumentsDiscoveredTextBlock" Grid.Row="0" Grid.Column="1" />
@@ -97,9 +100,14 @@
                     <DataGrid x:Name="ResultsDataGrid" Grid.Row="2" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Score" Binding="{Binding Score, StringFormat=F4}" Width="90" />
+                            <DataGridTextColumn Header="Source file" Binding="{Binding SourceFile}" Width="140" />
+                            <DataGridTextColumn Header="Section" Binding="{Binding SectionTitle}" Width="160" />
+                            <DataGridTextColumn Header="Kind" Binding="{Binding ChunkKind}" Width="110" />
+                            <DataGridTextColumn Header="Topic" Binding="{Binding Topic}" Width="110" />
+                            <DataGridTextColumn Header="Distance" Binding="{Binding Distance, StringFormat=F4}" Width="90" />
                             <DataGridTextColumn Header="Document path" Binding="{Binding DocumentPath}" Width="2*" />
                             <DataGridTextColumn Header="Chunk index" Binding="{Binding ChunkIndex}" Width="95" />
-                            <DataGridTextColumn Header="Text preview" Binding="{Binding Preview}" Width="3*" />
+                            <DataGridTextColumn Header="Original text preview" Binding="{Binding Preview}" Width="3*" />
                         </DataGrid.Columns>
                     </DataGrid>
                     <GroupBox Grid.Row="3" Header="Latency / status" Margin="0,12,0,0">
@@ -153,17 +161,29 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Current provider:" FontWeight="SemiBold" />
                             <TextBlock x:Name="ActiveProviderTextBlock" Grid.Row="0" Grid.Column="1" />
-                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Database path:" FontWeight="SemiBold" />
-                            <TextBox x:Name="DatabasePathTextBox" Grid.Row="1" Grid.Column="1" Margin="0,3" />
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="sqlite-vec extension:" FontWeight="SemiBold" />
-                            <TextBox x:Name="SqliteVecExtensionPathTextBox" Grid.Row="2" Grid.Column="1" Margin="0,3" />
-                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Embedding dimensions:" FontWeight="SemiBold" />
-                            <TextBox x:Name="EmbeddingDimensionsTextBox" Grid.Row="3" Grid.Column="1" Width="90" HorizontalAlignment="Left" Margin="0,3" />
-                            <TextBlock Grid.Row="4" Grid.Column="0" Text="TurboVec URL:" FontWeight="SemiBold" />
-                            <TextBox x:Name="TurboVecBaseUrlTextBox" Grid.Row="4" Grid.Column="1" Margin="0,3" />
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Embedding provider:" FontWeight="SemiBold" />
+                            <TextBlock x:Name="EmbeddingProviderTextBlock" Grid.Row="1" Grid.Column="1" />
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Embedding model:" FontWeight="SemiBold" />
+                            <TextBlock x:Name="EmbeddingModelTextBlock" Grid.Row="2" Grid.Column="1" />
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Index mode:" FontWeight="SemiBold" />
+                            <ComboBox x:Name="IndexModeComboBox" Grid.Row="3" Grid.Column="1" Width="180" HorizontalAlignment="Left" Margin="0,3">
+                                <ComboBoxItem Content="Dynamic" Tag="Dynamic" />
+                                <ComboBoxItem Content="Static read-only" Tag="StaticReadOnly" />
+                            </ComboBox>
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Database path:" FontWeight="SemiBold" />
+                            <TextBox x:Name="DatabasePathTextBox" Grid.Row="4" Grid.Column="1" Margin="0,3" />
+                            <TextBlock Grid.Row="5" Grid.Column="0" Text="sqlite-vec extension:" FontWeight="SemiBold" />
+                            <TextBox x:Name="SqliteVecExtensionPathTextBox" Grid.Row="5" Grid.Column="1" Margin="0,3" />
+                            <TextBlock Grid.Row="6" Grid.Column="0" Text="Embedding dimensions:" FontWeight="SemiBold" />
+                            <TextBox x:Name="EmbeddingDimensionsTextBox" Grid.Row="6" Grid.Column="1" Width="90" HorizontalAlignment="Left" Margin="0,3" />
+                            <TextBlock Grid.Row="7" Grid.Column="0" Text="Python sidecar URL:" FontWeight="SemiBold" />
+                            <TextBox x:Name="TurboVecBaseUrlTextBox" Grid.Row="7" Grid.Column="1" Margin="0,3" />
                         </Grid>
                     </GroupBox>
 
