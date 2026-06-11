@@ -40,6 +40,15 @@ README.md
 
 > WPF requires Windows. Run the WPF app on Windows with the .NET 8 SDK installed. The Python sidecar can run anywhere Python and the required packages are available, but this POC assumes both processes run locally on the same machine.
 
+## Where each process runs
+
+- **WPF app:** run this on **Windows**. WPF is a Windows desktop UI framework, so this app is not expected to run on Linux or macOS.
+- **Python sidecar:** run this in any local terminal that has Python available. On Windows, a normal **PowerShell**, **Command Prompt**, or **Windows Terminal** window is fine. You do **not** need WSL or a Linux shell for the sidecar.
+- **Recommended setup for this POC:** run both processes on the same Windows machine:
+  - Terminal 1: PowerShell or Command Prompt running the FastAPI sidecar on `127.0.0.1:8008`.
+  - Terminal 2: PowerShell or Command Prompt running the WPF app with `dotnet run`.
+- **Optional advanced setup:** you can run the sidecar in WSL/Linux if you want, but the WPF app still runs on Windows and must be able to reach the sidecar at `http://localhost:8008` or whatever URL you configure in `LocalRagClient`.
+
 ## Quick start: run the POC
 
 Run the system from **two terminals**: one for the Python sidecar and one for the WPF app.
