@@ -1,7 +1,7 @@
 <Window x:Class="LocalRag.Wpf.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Local RAG POC" Height="760" Width="1120" MinHeight="640" MinWidth="920">
+        Title="Local RAG POC" Height="820" Width="1180" MinHeight="700" MinWidth="980">
     <Grid Margin="12">
         <TabControl>
             <TabItem Header="Ingest">
@@ -116,6 +116,58 @@
                             <TextBlock x:Name="ChunksSearchedTextBlock" Margin="-20,0,24,0" />
                         </WrapPanel>
                     </GroupBox>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Vector Store">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Margin="0,0,8,8" VerticalAlignment="Center" Text="Vector store provider:" />
+                    <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,8">
+                        <ComboBox x:Name="VectorStoreProviderComboBox" Width="220" SelectionChanged="VectorStoreProviderComboBox_SelectionChanged">
+                            <ComboBoxItem Content="TurboVec Sidecar" Tag="TurboVecSidecar" />
+                            <ComboBoxItem Content="SQLite sqlite-vec" Tag="SqliteVec" />
+                        </ComboBox>
+                        <Button x:Name="SaveSettingsButton" Margin="12,0,0,0" Padding="14,4" Click="SaveSettingsButton_Click" Content="Save settings" />
+                        <Button x:Name="TestVectorStoreButton" Margin="8,0,0,0" Padding="14,4" Click="TestVectorStoreButton_Click" Content="Test selected provider" />
+                    </StackPanel>
+
+                    <GroupBox Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Header="Active provider" Margin="0,8,0,8">
+                        <Grid Margin="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Current provider:" FontWeight="SemiBold" />
+                            <TextBlock x:Name="ActiveProviderTextBlock" Grid.Row="0" Grid.Column="1" />
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Database path:" FontWeight="SemiBold" />
+                            <TextBox x:Name="DatabasePathTextBox" Grid.Row="1" Grid.Column="1" Margin="0,3" />
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="sqlite-vec extension:" FontWeight="SemiBold" />
+                            <TextBox x:Name="SqliteVecExtensionPathTextBox" Grid.Row="2" Grid.Column="1" Margin="0,3" />
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Embedding dimensions:" FontWeight="SemiBold" />
+                            <TextBox x:Name="EmbeddingDimensionsTextBox" Grid.Row="3" Grid.Column="1" Width="90" HorizontalAlignment="Left" Margin="0,3" />
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="TurboVec URL:" FontWeight="SemiBold" />
+                            <TextBox x:Name="TurboVecBaseUrlTextBox" Grid.Row="4" Grid.Column="1" Margin="0,3" />
+                        </Grid>
+                    </GroupBox>
+
+                    <TextBlock x:Name="SettingsStatusTextBlock" Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Text="Ready." TextWrapping="Wrap" />
                 </Grid>
             </TabItem>
         </TabControl>
