@@ -63,6 +63,18 @@ class SearchRequest(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class EmbedRequest(BaseModel):
+    text: str
+
+
+class EmbedResponse(BaseModel):
+    embedding: list[float]
+    embedding_model: str = Field(alias="embeddingModel")
+    vector_dimension: int = Field(alias="vectorDimension")
+
+    model_config = {"populate_by_name": True}
+
+
 class SearchResult(BaseModel):
     score: float
     document_path: str = Field(alias="documentPath")
@@ -403,6 +415,18 @@ def ingest_folder(request: IngestRequest) -> IngestResponse:
         indexPath=str(INDEX_PATH),
         metadataDbPath=str(DB_PATH),
         message="Ingest complete.",
+    )
+
+
+@app.post("/embed", response_model=EmbedResponse, response_model_by_alias=True)
+def embed(request: EmbedRequest) -> EmbedResponse:
+    if not request.text.strip():
+        raise HTTPException(status_code=400, detail="Text is required.")
+    vector = embed_texts([request.text])[0].astype(float).tolist()
+    return EmbedResponse(
+        embedding=vector,
+        embeddingModel=EMBEDDING_MODEL,
+        vectorDimension=VECTOR_DIMENSION,
     )
 
 

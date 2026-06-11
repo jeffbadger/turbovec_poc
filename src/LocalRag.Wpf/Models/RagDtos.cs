@@ -46,3 +46,37 @@ public sealed record StatsResponse(
     string EmbeddingModel,
     int VectorDimension,
     int BitWidth);
+
+public sealed record EmbedRequest(string Text);
+
+public sealed record EmbedResponse(
+    IReadOnlyList<float> Embedding,
+    string EmbeddingModel,
+    int VectorDimension);
+
+public sealed record RustSearchRequest(
+    IReadOnlyList<float> QueryEmbedding,
+    int TopK,
+    IReadOnlyDictionary<string, string>? MetadataFilter = null,
+    IReadOnlyList<string>? AllowedDocumentIds = null);
+
+public sealed record RustSearchResponse(
+    string CollectionName,
+    IReadOnlyList<RustSearchResult> Results,
+    double ElapsedMs);
+
+public sealed record RustSearchResult(
+    string Id,
+    string DocumentId,
+    string ChunkId,
+    double Score,
+    string Text,
+    IReadOnlyDictionary<string, string> Metadata);
+
+public sealed record RustCollectionStatsResponse(
+    string Name,
+    int Dimensions,
+    string Distance,
+    int RecordCount,
+    string Engine,
+    int MemoryBytesEstimate);
