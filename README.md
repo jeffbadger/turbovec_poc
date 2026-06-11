@@ -86,7 +86,7 @@ README.md
 ### Embedded sqlite-vec WPF provider
 
 - Windows x64 for the checked-in sqlite-vec native extension.
-- No Docker, Python, or background vector database server is required for sqlite-vec storage/search.
+- No Docker or background vector database server is required for sqlite-vec storage/search; the WPF sqlite-vec flow still uses the Python sidecar to generate required BGE embeddings.
 - The native extension must be present at `src/LocalRag.Wpf/Native/win-x64/vec0.dll` so the WPF project can copy it to the output directory.
 
 ### Standalone Rust sidecar
@@ -99,7 +99,7 @@ README.md
 
 - **WPF app:** run this on **Windows**. WPF is a Windows desktop UI framework, so this app is not expected to run on Linux or macOS.
 - **Python sidecar:** run this in any local terminal that has Python available. On Windows, a normal **PowerShell**, **Command Prompt**, or **Windows Terminal** window is fine. You do **not** need WSL or a Linux shell for the sidecar.
-- **sqlite-vec provider:** runs in-process inside the WPF app. It loads `Native\win-x64\vec0.dll` from the WPF output directory and stores vectors in a local SQLite file.
+- **sqlite-vec provider:** runs storage/search in-process inside the WPF app. It loads `Native\win-x64\vec0.dll` from the WPF output directory, stores vectors in a local SQLite file, and calls the Python sidecar for BGE embeddings.
 - **Rust sidecar:** run this in any local terminal with Rust stable installed. It is standalone, and the WPF app can optionally call it for search/benchmark when the **Use Rust sidecar** toggle is enabled.
 - **Recommended default POC setup:** run the WPF app and Python sidecar on the same Windows machine:
   - Terminal 1: PowerShell or Command Prompt running the FastAPI sidecar on `127.0.0.1:8008`.
@@ -114,7 +114,7 @@ The WPF app has a **Vector Store** tab for choosing the active provider. Setting
 | Provider | UI label | Requires Python sidecar for storage/search? | Storage | Notes |
 | --- | --- | --- | --- | --- |
 | `TurboVecSidecar` | TurboVec Sidecar | Yes | `src/python-sidecar/rag_store` | Preserves the original Python FastAPI + TurboVec behavior. |
-| `SqliteVec` | SQLite sqlite-vec | No | `%LOCALAPPDATA%\TurboVecPoc\rag.db` by default | Loads `Native\win-x64\vec0.dll` relative to the WPF output directory. |
+| `SqliteVec` | SQLite sqlite-vec | Yes, for embeddings | `%LOCALAPPDATA%\TurboVecPoc\rag.db` by default | Loads `Native\win-x64\vec0.dll`, stores `float[384]` vectors, and validates BGE embedding metadata. |
 
 The default provider remains **TurboVec Sidecar**. For setup details and troubleshooting, see `docs/sqlite-vec-vector-store.md`.
 
@@ -221,7 +221,7 @@ To compare against the Rust sidecar, start the Rust process, ensure the selected
 
 ## Quick start: run WPF with sqlite-vec
 
-Use this path when you want embedded local vector storage/search without a vector database server.
+Use this path when you want embedded local vector storage/search without a vector database server. Start the Python sidecar too; WPF calls it for `BAAI/bge-small-en-v1.5` embeddings.
 
 1. Confirm the native extension exists at `src/LocalRag.Wpf/Native/win-x64/vec0.dll`.
 2. Run the WPF app:
@@ -233,7 +233,7 @@ Use this path when you want embedded local vector storage/search without a vecto
 3. Open **Vector Store**.
 4. Select **SQLite sqlite-vec**.
 5. Keep the default extension path `Native\win-x64\vec0.dll`, or enter another path if you intentionally copied the DLL elsewhere.
-6. Keep `Embedding dimensions` aligned with the embedding pipeline. The default is `384`.
+6. Keep `Embedding dimensions` at `384`; startup validation also requires model `BAAI/bge-small-en-v1.5`, normalized embeddings, and cosine distance metadata.
 7. Click **Save settings**.
 8. Click **Test selected provider**. The provider creates/opens the configured SQLite DB, loads sqlite-vec, verifies `vec_version()`, and creates the required schema.
 9. Ingest a TXT/MD/HTML folder and search from **Retrieve / Speed Test**.
@@ -487,8 +487,8 @@ SQLite stores document rows and chunk rows. TurboVec stores/searches normalized 
 - Default SQLite database: `%LOCALAPPDATA%\TurboVecPoc\rag.db`
 - Native extension source path: `src/LocalRag.Wpf/Native/win-x64/vec0.dll`
 - Native extension output path: `Native\win-x64\vec0.dll` relative to `AppContext.BaseDirectory`
-- Tables: `documents`, `chunks`, and `chunk_vectors` (`vec0`)
-- Vector dimension: configured by `VectorStore.EmbeddingDimensions` and defaulted to `384`
+- Tables: `documents`, `chunks`, `chunk_vectors` (`vec0`), and `embedding_metadata`
+- Vector dimension: `384`, enforced against the sqlite-vec `chunk_vectors.embedding float[384]` schema
 
 ### Rust sidecar storage
 

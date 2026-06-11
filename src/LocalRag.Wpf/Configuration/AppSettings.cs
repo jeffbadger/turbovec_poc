@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using LocalRag.Wpf.Rag;
 using LocalRag.Wpf.VectorStore;
 
 namespace LocalRag.Wpf.Configuration;
@@ -51,7 +52,10 @@ public sealed class VectorStoreSettings
     public VectorStoreProviderType Provider { get; set; } = VectorStoreProviderType.TurboVecSidecar;
     public string DatabasePath { get; set; } = "%LOCALAPPDATA%\\TurboVecPoc\\rag.db";
     public string SqliteVecExtensionPath { get; set; } = "Native\\win-x64\\vec0.dll";
-    public int EmbeddingDimensions { get; set; } = 384;
+    public string EmbeddingModelId { get; set; } = BgeEmbeddingService.RequiredModelId;
+    public int EmbeddingDimensions { get; set; } = BgeEmbeddingService.RequiredDimensions;
+    public bool NormalizeEmbeddings { get; set; } = BgeEmbeddingService.RequiredNormalizeEmbeddings;
+    public string DistanceMetric { get; set; } = BgeEmbeddingService.RequiredDistanceMetric;
 }
 
 public sealed class TurboVecSettings

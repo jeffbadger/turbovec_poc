@@ -7,9 +7,9 @@ namespace LocalRag.Wpf.Rag;
 public sealed class RagSearchService
 {
     private readonly IVectorStoreProvider _vectorStoreProvider;
-    private readonly LocalHashEmbeddingService _embeddingService;
+    private readonly BgeEmbeddingService _embeddingService;
 
-    public RagSearchService(IVectorStoreProvider vectorStoreProvider, LocalHashEmbeddingService embeddingService)
+    public RagSearchService(IVectorStoreProvider vectorStoreProvider, BgeEmbeddingService embeddingService)
     {
         _vectorStoreProvider = vectorStoreProvider;
         _embeddingService = embeddingService;
@@ -18,7 +18,7 @@ public sealed class RagSearchService
     public async Task<SearchResponse> SearchAsync(SearchRequest request, CancellationToken cancellationToken = default)
     {
         await _vectorStoreProvider.InitializeAsync(cancellationToken);
-        var embedding = await _embeddingService.EmbedAsync(request.Query, cancellationToken);
+        var embedding = await _embeddingService.EmbedQueryAsync(request.Query, cancellationToken);
         var stopwatch = Stopwatch.StartNew();
         var hits = await _vectorStoreProvider.SearchAsync(embedding, request.TopK, cancellationToken);
         stopwatch.Stop();

@@ -45,14 +45,18 @@ public sealed record StatsResponse(
     bool IndexExists,
     string EmbeddingModel,
     int VectorDimension,
-    int BitWidth);
+    int BitWidth,
+    bool NormalizeEmbeddings,
+    string DistanceMetric);
 
-public sealed record EmbedRequest(string Text);
+public sealed record EmbedRequest(string Text, bool ApplyQueryPrefix = true);
 
 public sealed record EmbedResponse(
     IReadOnlyList<float> Embedding,
     string EmbeddingModel,
-    int VectorDimension);
+    int VectorDimension,
+    bool NormalizeEmbeddings,
+    string DistanceMetric);
 
 public sealed record RustSearchRequest(
     IReadOnlyList<float> QueryEmbedding,

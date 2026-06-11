@@ -183,7 +183,7 @@ public partial class MainWindow : Window
         var databasePath = provider is SqliteVecVectorStoreProvider sqliteVec
             ? sqliteVec.DatabasePath
             : _settings.VectorStore.DatabasePath;
-        var service = new LocalDocumentIngestionService(provider, new LocalHashEmbeddingService(_settings.VectorStore.EmbeddingDimensions));
+        var service = new LocalDocumentIngestionService(provider, new BgeEmbeddingService(_settings.TurboVec));
         return await service.IngestFolderAsync(request, databasePath);
     }
 
@@ -196,7 +196,7 @@ public partial class MainWindow : Window
         }
 
         var provider = VectorStoreProviderFactory.Create(_settings);
-        var service = new RagSearchService(provider, new LocalHashEmbeddingService(_settings.VectorStore.EmbeddingDimensions));
+        var service = new RagSearchService(provider, new BgeEmbeddingService(_settings.TurboVec));
         return await service.SearchAsync(request);
     }
 
@@ -423,7 +423,11 @@ public partial class MainWindow : Window
 
         _settings.VectorStore.DatabasePath = DatabasePathTextBox.Text.Trim();
         _settings.VectorStore.SqliteVecExtensionPath = SqliteVecExtensionPathTextBox.Text.Trim();
+        _settings.VectorStore.EmbeddingModelId = BgeEmbeddingService.RequiredModelId;
         _settings.VectorStore.EmbeddingDimensions = dimensions;
+        _settings.VectorStore.NormalizeEmbeddings = BgeEmbeddingService.RequiredNormalizeEmbeddings;
+        _settings.VectorStore.DistanceMetric = BgeEmbeddingService.RequiredDistanceMetric;
+        BgeEmbeddingService.ValidateSettings(_settings.VectorStore);
         _settings.TurboVec.BaseUrl = TurboVecBaseUrlTextBox.Text.Trim();
         _client = new LocalRagClient(_settings.TurboVec.BaseUrl);
         UpdateActiveProviderDisplay();

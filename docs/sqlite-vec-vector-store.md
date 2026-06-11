@@ -4,7 +4,7 @@ The WPF app can use `sqlite-vec` as a second local vector-store provider alongsi
 
 ## When to use this provider
 
-Use **SQLite sqlite-vec** when you want a local, embedded vector store that does not require Docker, Python, or a background vector database server for storage and vector search.
+Use **SQLite sqlite-vec** when you want a local, embedded vector store that does not require Docker or a background vector database server for storage and vector search. The WPF sqlite-vec path still calls the Python sidecar for BGE embeddings so that ingest and search use the required `BAAI/bge-small-en-v1.5` model.
 
 Use **TurboVec Sidecar** when you want to keep the original Python FastAPI flow, including the Python document extractors, `sentence-transformers` embedding model, SQLite metadata DB, and TurboVec `IdMapIndex`.
 
@@ -24,7 +24,10 @@ The relevant settings are:
     "Provider": "TurboVecSidecar",
     "DatabasePath": "%LOCALAPPDATA%\\TurboVecPoc\\rag.db",
     "SqliteVecExtensionPath": "Native\\win-x64\\vec0.dll",
-    "EmbeddingDimensions": 384
+    "EmbeddingModelId": "BAAI/bge-small-en-v1.5",
+    "EmbeddingDimensions": 384,
+    "NormalizeEmbeddings": true,
+    "DistanceMetric": "cosine"
   },
   "TurboVec": {
     "BaseUrl": "http://localhost:8008"
@@ -37,7 +40,10 @@ The relevant settings are:
 | `VectorStore.Provider` | `TurboVecSidecar` or `SqliteVec`. The WPF **Vector Store** tab writes this value. |
 | `VectorStore.DatabasePath` | SQLite database used by the sqlite-vec provider. `%LOCALAPPDATA%` is expanded. Relative paths are resolved from `AppContext.BaseDirectory`. |
 | `VectorStore.SqliteVecExtensionPath` | Path to the sqlite-vec loadable extension. Relative paths are resolved from `AppContext.BaseDirectory`. |
-| `VectorStore.EmbeddingDimensions` | Expected vector length. This must match the embedding pipeline used for ingest and search. The default is `384`. |
+| `VectorStore.EmbeddingModelId` | Required embedding model ID. Startup validation requires `BAAI/bge-small-en-v1.5`. |
+| `VectorStore.EmbeddingDimensions` | Required vector length. Startup validation requires `384`, matching the BGE small model and the sqlite-vec table. |
+| `VectorStore.NormalizeEmbeddings` | Required to be `true`; document chunks and query vectors are normalized before storage/search. |
+| `VectorStore.DistanceMetric` | Tracked as `cosine`. |
 | `TurboVec.BaseUrl` | Base URL for the existing Python/TurboVec sidecar provider. |
 
 ## Native extension placement
@@ -67,7 +73,7 @@ Do not download sqlite-vec during normal app setup; use the checked-in `vec0.dll
 1. Run the WPF app.
 2. Open the **Vector Store** tab.
 3. Select **SQLite sqlite-vec**.
-4. Confirm the database path, extension path, and embedding dimensions.
+4. Confirm the database path, extension path, and embedding dimensions (`384`).
 5. Click **Save settings**.
 6. Click **Test selected provider**.
 7. Ingest a folder from the **Ingest** tab.
@@ -108,10 +114,18 @@ CREATE TABLE IF NOT EXISTS chunks (
 );
 
 CREATE VIRTUAL TABLE IF NOT EXISTS chunk_vectors
-USING vec0(embedding float[N]);
+USING vec0(embedding float[384]);
+
+CREATE TABLE IF NOT EXISTS embedding_metadata (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    embedding_model_id TEXT NOT NULL,
+    embedding_dimensions INTEGER NOT NULL,
+    normalize_embeddings INTEGER NOT NULL CHECK (normalize_embeddings IN (0, 1)),
+    distance_metric TEXT NOT NULL
+);
 ```
 
-`N` comes from `VectorStore.EmbeddingDimensions`.
+The vector-table dimension must remain `384`; startup fails if an existing `chunk_vectors` schema does not match the configured embedding dimension. The metadata row must track `BAAI/bge-small-en-v1.5`, `384`, normalized embeddings, and cosine distance.
 
 Chunk row IDs are aligned with `chunk_vectors.rowid`, so search joins vector hits back to chunk text and document metadata.
 
@@ -123,7 +137,8 @@ The WPF provider validation button and normal ingest/search flows surface clear 
 - Extension load failure: includes the extension path and underlying exception message.
 - `vec_version()` verification failure after extension load.
 - SQLite database open/create failure.
-- Embedding dimension mismatch.
+- Embedding model metadata mismatch.
+- sqlite-vec vector table dimension mismatch.
 - Search before provider initialization.
 - Invalid provider setting.
 
@@ -132,7 +147,7 @@ The WPF provider validation button and normal ingest/search flows surface clear 
 - Select **SQLite sqlite-vec** and save settings.
 - Click **Test selected provider** and verify success.
 - Confirm `%LOCALAPPDATA%\TurboVecPoc\rag.db` is created.
-- Ingest a folder with TXT/MD/HTML files.
+- Start the Python sidecar so WPF can request BGE embeddings, then ingest a folder with TXT/MD/HTML files.
 - Search for a query and verify results include source path, chunk index, score, distance-derived ranking, and text.
 - Restart the app and search again to confirm persistence.
 - Temporarily rename `Native\win-x64\vec0.dll` in the output folder and verify the missing-extension error is shown.
