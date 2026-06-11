@@ -33,35 +33,46 @@ README.md
 
 ## Prerequisites
 
-- .NET 8 SDK
-- Python 3.10+
+- Windows for the WPF desktop app.
+- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0).
+- Python 3.10+.
+- Internet access the first time the sidecar loads the embedding model (`BAAI/bge-small-en-v1.5`).
 
 > WPF requires Windows. Run the WPF app on Windows with the .NET 8 SDK installed. The Python sidecar can run anywhere Python and the required packages are available, but this POC assumes both processes run locally on the same machine.
 
-## Python setup
+## Quick start: run the POC
 
-From the repository root:
+Run the system from **two terminals**: one for the Python sidecar and one for the WPF app.
 
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r sidecar/requirements.txt
-```
+### 1. Open Terminal 1 at the repository root
 
-On Windows PowerShell, activate the virtual environment with:
+Windows PowerShell:
 
 ```powershell
-.venv\Scripts\Activate.ps1
-```
-
-## Run sidecar
-
-```bash
+cd C:\path\to\LocalRagPoc
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r sidecar\requirements.txt
 cd sidecar
 uvicorn app:app --host 127.0.0.1 --port 8008
 ```
 
-Health check:
+macOS/Linux shell, for sidecar-only testing:
+
+```bash
+cd /path/to/LocalRagPoc
+python -m venv .venv
+source .venv/bin/activate
+pip install -r sidecar/requirements.txt
+cd sidecar
+uvicorn app:app --host 127.0.0.1 --port 8008
+```
+
+Keep this terminal open. The sidecar must keep running while the WPF app is open.
+
+### 2. Verify the sidecar is reachable
+
+Open a browser or a second shell and call:
 
 ```bash
 curl http://127.0.0.1:8008/health
@@ -73,19 +84,61 @@ Expected response:
 {"status":"OK"}
 ```
 
-## Run WPF app
-
-From the repository root:
+You can also inspect current index/database stats:
 
 ```bash
-dotnet run --project src/LocalRag.Wpf/LocalRag.Wpf.csproj
+curl http://127.0.0.1:8008/stats
 ```
 
-The WPF client defaults to this sidecar URL:
+### 3. Open Terminal 2 at the repository root and run WPF
+
+Windows PowerShell:
+
+```powershell
+cd C:\path\to\LocalRagPoc
+dotnet run --project src\LocalRag.Wpf\LocalRag.Wpf.csproj
+```
+
+The WPF client talks to the sidecar at:
 
 ```text
 http://localhost:8008
 ```
+
+### 4. Ingest documents from the WPF app
+
+1. Go to the **Ingest** tab.
+2. Click **Browse...** and choose a local folder containing supported files.
+3. Leave the default file type checkboxes selected, or choose a subset.
+4. Leave chunk settings at the defaults for the first run:
+   - Chunk size: `900`
+   - Overlap: `150`
+5. Click **Start ingest**.
+6. Wait for the status to show completion and review:
+   - Documents discovered
+   - Documents indexed
+   - Chunks indexed
+   - Elapsed seconds
+   - Index path
+   - Metadata DB path
+
+The first ingest/search can take longer because Python packages and the embedding model may initialize and the model may download.
+
+### 5. Search and benchmark from the WPF app
+
+1. Go to the **Retrieve / Speed Test** tab.
+2. Enter a query related to the ingested documents.
+3. Leave `TopK` at `10`, or set a smaller/larger value.
+4. Click **Search** to see ranked chunks and last-query latency.
+5. Click **Benchmark** to run repeated searches and see average and P95 latency.
+
+## Common run issues
+
+- **`uvicorn` is not recognized**: activate the Python virtual environment first, then rerun `pip install -r sidecar/requirements.txt`.
+- **WPF cannot connect / sidecar request failed**: make sure Terminal 1 is still running `uvicorn` on port `8008`.
+- **PowerShell blocks activation**: run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`, then activate `.\.venv\Scripts\Activate.ps1` again.
+- **First search or ingest is slow**: the embedding model loads lazily and may download on first use.
+- **Port 8008 already in use**: stop the other process using that port, or change both the `uvicorn --port` value and the default URL in `LocalRagClient`.
 
 ## POC success criteria
 
