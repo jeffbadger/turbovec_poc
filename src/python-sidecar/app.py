@@ -29,6 +29,7 @@ DISTANCE_METRIC = "cosine"
 QUERY_INSTRUCTION_TEMPLATE = "Represent this sentence for searching relevant passages: {query}"
 BIT_WIDTH = 4
 SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".md", ".docx", ".html", ".htm"}
+DEFAULT_TOP_K = 2
 
 app = FastAPI(title="Local RAG POC Sidecar")
 _store_lock = threading.RLock()
@@ -61,7 +62,7 @@ class IngestResponse(BaseModel):
 
 class SearchRequest(BaseModel):
     query: str
-    top_k: int = Field(default=10, alias="topK", gt=0)
+    top_k: int = Field(default=DEFAULT_TOP_K, alias="topK", gt=0)
 
     model_config = {"populate_by_name": True}
 
@@ -102,7 +103,7 @@ class SearchResponse(BaseModel):
 
 class BenchmarkRequest(BaseModel):
     query: str
-    top_k: int = Field(default=10, alias="topK", gt=0)
+    top_k: int = Field(default=DEFAULT_TOP_K, alias="topK", gt=0)
     runs: int = Field(default=25, gt=0, le=500)
 
     model_config = {"populate_by_name": True}

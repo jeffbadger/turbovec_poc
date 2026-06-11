@@ -15,6 +15,7 @@ public sealed class AppSettings
     };
 
     public VectorStoreSettings VectorStore { get; set; } = new();
+    public SearchSettings Search { get; set; } = new();
     public TurboVecSettings TurboVec { get; set; } = new();
 
     public static string SettingsPath => Path.Combine(
@@ -32,7 +33,11 @@ public sealed class AppSettings
         }
 
         var json = File.ReadAllText(SettingsPath);
-        return JsonSerializer.Deserialize<AppSettings>(json, JsonOptions) ?? new AppSettings();
+        var settings = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions) ?? new AppSettings();
+        settings.VectorStore ??= new VectorStoreSettings();
+        settings.Search ??= new SearchSettings();
+        settings.TurboVec ??= new TurboVecSettings();
+        return settings;
     }
 
     public void Save()
@@ -56,6 +61,13 @@ public sealed class VectorStoreSettings
     public int EmbeddingDimensions { get; set; } = BgeEmbeddingService.RequiredDimensions;
     public bool NormalizeEmbeddings { get; set; } = BgeEmbeddingService.RequiredNormalizeEmbeddings;
     public string DistanceMetric { get; set; } = BgeEmbeddingService.RequiredDistanceMetric;
+}
+
+public sealed class SearchSettings
+{
+    public const int DefaultTopKValue = 2;
+
+    public int DefaultTopK { get; set; } = DefaultTopKValue;
 }
 
 public sealed class TurboVecSettings
