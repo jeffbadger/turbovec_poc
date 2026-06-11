@@ -259,7 +259,7 @@ public partial class MainWindow : Window
 
     private bool TryBuildSearchRequest(out SearchRequest request)
     {
-        request = new SearchRequest(string.Empty, 10);
+        request = new SearchRequest(string.Empty, SearchSettings.DefaultTopKValue);
         var query = QueryTextBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(query))
         {
@@ -278,6 +278,7 @@ public partial class MainWindow : Window
             return false;
         }
 
+        _settings.Search.DefaultTopK = topK;
         request = new SearchRequest(query, topK);
         return true;
     }
@@ -397,6 +398,7 @@ public partial class MainWindow : Window
             }
         }
 
+        TopKTextBox.Text = _settings.Search.DefaultTopK.ToString();
         DatabasePathTextBox.Text = _settings.VectorStore.DatabasePath;
         SqliteVecExtensionPathTextBox.Text = _settings.VectorStore.SqliteVecExtensionPath;
         EmbeddingDimensionsTextBox.Text = _settings.VectorStore.EmbeddingDimensions.ToString();
@@ -419,6 +421,16 @@ public partial class MainWindow : Window
         if (!int.TryParse(EmbeddingDimensionsTextBox.Text, out var dimensions) || dimensions <= 0)
         {
             throw new InvalidOperationException("Embedding dimensions must be a positive integer.");
+        }
+
+        if (TopKTextBox is not null)
+        {
+            if (!int.TryParse(TopKTextBox.Text, out var defaultTopK) || defaultTopK <= 0)
+            {
+                throw new InvalidOperationException("Default TopK must be a positive integer.");
+            }
+
+            _settings.Search.DefaultTopK = defaultTopK;
         }
 
         _settings.VectorStore.DatabasePath = DatabasePathTextBox.Text.Trim();
