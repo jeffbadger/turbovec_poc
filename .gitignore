@@ -1,0 +1,8 @@
+.venv/
+**/bin/
+**/obj/
+sidecar/rag_store/*.db
+sidecar/rag_store/*.db-*
+sidecar/rag_store/*.tvim
+__pycache__/
+*.py[cod]
