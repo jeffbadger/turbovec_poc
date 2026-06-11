@@ -279,15 +279,14 @@ Delete behavior:
 - Does not delete persisted JSON files.
 - Returns `deleted: false` if the collection was not present in memory.
 
-## Future C# integration notes
+## WPF integration notes
 
-A future WPF provider can call this API over HTTP without referencing Rust code directly. Suggested C# provider behavior:
+The WPF app can call this API over HTTP without referencing Rust code directly when **Use Rust sidecar** is enabled. Current WPF behavior:
 
 1. Start or connect to `http://127.0.0.1:43187`.
-2. Call `GET /health` and verify `status == "ok"`.
-3. Create or load a named collection for the active scenario.
-4. Send embeddings produced by the existing embedding pipeline to `upsert`.
-5. Use `search` with `allowedDocumentIds` and/or `metadataFilter` for retrieval constraints.
-6. Call `save` after ingest or batch updates when persistence is needed.
+2. Create or load a named collection before searching from WPF.
+3. Keep the Python sidecar running so WPF can request query embeddings from `/embed`.
+4. WPF sends the query embedding to `POST /collections/{collectionName}/search`.
+5. WPF calls `GET /collections/{collectionName}/stats` to display the current record count as chunks searched.
 
-The WPF app has not been modified in this task.
+For ingest or batch updates, callers still need to send embeddings produced by the existing embedding pipeline to `upsert`, then call `save` when persistence is needed. WPF does not currently ingest directly into Rust collections.

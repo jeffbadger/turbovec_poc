@@ -3,8 +3,8 @@
 A small local retrieval proof-of-concept with two sidecar paths:
 
 - a **C# WPF app** on .NET 8 for ingest, search, and speed testing;
-- the existing **Python FastAPI sidecar** used by the WPF app today;
-- a new isolated **Rust vector-index sidecar** for future WPF integration;
+- the existing **Python FastAPI sidecar** used by the WPF app for ingest, embeddings, and default search;
+- an optional **Rust vector-index sidecar** that the WPF app can use for search and benchmark calls;
 - **TurboVec `IdMapIndex`** in the Python sidecar for local vector indexing/search;
 - **SQLite** in the Python sidecar for document metadata and chunk text.
 
@@ -15,8 +15,8 @@ There is intentionally **no LLM/chat layer** in v1. The current WPF flow proves 
 | Component | Path | Status | Default URL | Notes |
 | --- | --- | --- | --- | --- |
 | WPF app | `src/LocalRag.Wpf` | Existing app | n/a | Runs on Windows with .NET 8. |
-| Python sidecar | `src/python-sidecar` | Used by the WPF app today | `http://localhost:8008` | Handles ingest, embeddings, SQLite metadata, and TurboVec vector search. |
-| Rust sidecar | `src/turbovec-sidecar` | Standalone, future integration target | `http://127.0.0.1:43187` | Owns local vector collections over HTTP JSON; WPF does **not** call it yet. |
+| Python sidecar | `src/python-sidecar` | Default WPF provider | `http://localhost:8008` | Handles ingest, embeddings, SQLite metadata, and default TurboVec vector search. |
+| Rust sidecar | `src/turbovec-sidecar` | Optional WPF search provider | `http://127.0.0.1:43187` | Owns local vector collections over HTTP JSON. The WPF toggle can call it for search/benchmark after the collection is populated. |
 
 ## Repository layout
 
@@ -54,6 +54,7 @@ src/
     tests/
 docs/
   python-sidecar-usage.md
+  wpf-app-usage.md
   rust-sidecar-api.md
   rust-sidecar-architecture.md
   turbovec-integration-notes.md
@@ -75,17 +76,17 @@ README.md
 
 - Rust stable.
 - No Python, pip, conda, virtual environment, Docker, or administrator rights are required.
-- The Rust sidecar is not wired into the WPF app yet.
+- The Rust sidecar is optional for WPF search/benchmark only. WPF ingest remains Python-sidecar only.
 
 ## Where each process runs
 
 - **WPF app:** run this on **Windows**. WPF is a Windows desktop UI framework, so this app is not expected to run on Linux or macOS.
 - **Python sidecar:** run this in any local terminal that has Python available. On Windows, a normal **PowerShell**, **Command Prompt**, or **Windows Terminal** window is fine. You do **not** need WSL or a Linux shell for the sidecar.
-- **Rust sidecar:** run this in any local terminal with Rust stable installed. It is standalone and can be tested without the WPF app.
-- **Recommended current POC setup:** run the WPF app and Python sidecar on the same Windows machine:
+- **Rust sidecar:** run this in any local terminal with Rust stable installed. It is standalone, and the WPF app can optionally call it for search/benchmark when the **Use Rust sidecar** toggle is enabled.
+- **Recommended default POC setup:** run the WPF app and Python sidecar on the same Windows machine:
   - Terminal 1: PowerShell or Command Prompt running the FastAPI sidecar on `127.0.0.1:8008`.
   - Terminal 2: PowerShell or Command Prompt running the WPF app with `dotnet run`.
-- **Future Rust integration:** a future C# provider can call the Rust sidecar at `http://127.0.0.1:43187`, but that WPF work is intentionally not part of the Rust sidecar task.
+- **Optional Rust search setup:** also run the Rust sidecar on `127.0.0.1:43187`, then enable **Use Rust sidecar** in the WPF Retrieve / Speed Test tab and enter the target collection name. The Python sidecar still supplies query embeddings; the Rust sidecar performs vector search.
 
 ## Quick start: run the current WPF POC with the Python sidecar
 
@@ -146,10 +147,16 @@ cd C:\path\to\LocalRagPoc
 dotnet run --project src\LocalRag.Wpf\LocalRag.Wpf.csproj
 ```
 
-The WPF client currently talks to the Python sidecar at:
+By default, the WPF client talks to the Python sidecar at:
 
 ```text
 http://localhost:8008
+```
+
+When **Use Rust sidecar** is checked, WPF still calls the Python sidecar for query embeddings, then sends the query vector to the Rust sidecar at:
+
+```text
+http://127.0.0.1:43187
 ```
 
 ### 4. Ingest documents from the WPF app
@@ -179,14 +186,16 @@ The first ingest/search can take longer because Python packages and the embeddin
 4. Click **Search** to see ranked chunks and last-query latency.
 5. Click **Benchmark** to run repeated searches and see average and P95 latency.
 
+To compare against the Rust sidecar, start the Rust process, ensure the selected collection exists and is populated with vectors that use the same embedding dimension (`384` for the current Python model), check **Use Rust sidecar**, and set **Collection** to that Rust collection name. In Rust mode, the WPF app disables the Ingest tab controls because the current Rust sidecar does not perform document discovery, chunking, or embedding.
+
 ## Standalone Rust vector-index sidecar
 
 The Rust sidecar lives at `src/turbovec-sidecar`. It exposes a local HTTP JSON API for vector collection creation, vector upsert, vector search, collection stats, JSON save/load, list, delete, and health checks.
 
 Important boundaries:
 
-- The WPF app has **not** been modified to call the Rust sidecar.
-- The Rust sidecar does **not** create embeddings.
+- The WPF app can call the Rust sidecar for search/benchmark when **Use Rust sidecar** is enabled.
+- The Rust sidecar does **not** create embeddings; the WPF app currently obtains query embeddings from the Python sidecar before calling Rust search.
 - The Rust sidecar does **not** chunk documents.
 - The Rust sidecar does **not** generate RAG answers.
 - The default Rust engine is a functional in-memory implementation with JSON persistence for POC use.
@@ -305,6 +314,7 @@ curl -X DELETE http://127.0.0.1:43187/collections/scenario-001-small
 
 ### Sidecar docs
 
+- WPF app usage: `docs/wpf-app-usage.md`
 - Python sidecar usage without WPF: `docs/python-sidecar-usage.md`
 - Rust API contract: `docs/rust-sidecar-api.md`
 - Architecture: `docs/rust-sidecar-architecture.md`
@@ -315,7 +325,7 @@ curl -X DELETE http://127.0.0.1:43187/collections/scenario-001-small
 ## Common run issues
 
 - **`uvicorn` is not recognized**: activate the Python virtual environment first, then rerun `pip install -r src/python-sidecar/requirements.txt`.
-- **WPF cannot connect / sidecar request failed**: make sure Terminal 1 is still running `uvicorn` on port `8008`.
+- **WPF cannot connect / sidecar request failed**: make sure Terminal 1 is still running `uvicorn` on port `8008`. If **Use Rust sidecar** is enabled, also make sure the Rust sidecar is running on port `43187` and the collection name exists.
 - **PowerShell blocks activation**: run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`, then activate `.\.venv\Scripts\Activate.ps1` again.
 - **First search or ingest is slow**: the embedding model loads lazily and may download on first use.
 - **Port 8008 already in use**: stop the other process using that port, or change both the `uvicorn --port` value and the default URL in `LocalRagClient`.
@@ -330,15 +340,15 @@ EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"
 _model = SentenceTransformer(EMBEDDING_MODEL)
 ```
 
-That means the current WPF/Python runtime flow is:
+That means the default WPF/Python runtime flow is:
 
 1. Start the FastAPI sidecar with `uvicorn`.
 2. On the first ingest or search, the Python sidecar loads/downloads `BAAI/bge-small-en-v1.5`.
 3. The Python sidecar creates embeddings in-process.
 4. TurboVec stores/searches the vectors.
-5. WPF talks only to the Python sidecar at `http://localhost:8008`.
+5. WPF talks to the Python sidecar at `http://localhost:8008`.
 
-The Rust sidecar expects callers to provide embeddings in API requests. It does not load `BAAI/bge-small-en-v1.5` and does not call LM Studio.
+When **Use Rust sidecar** is enabled, WPF uses the Python sidecar `/embed` endpoint for the query vector, then calls the Rust sidecar `/collections/{collectionName}/search` endpoint. The Rust sidecar expects callers to provide embeddings in API requests. It does not load `BAAI/bge-small-en-v1.5` and does not call LM Studio.
 
 ### How the Python sidecar finds the model
 
@@ -366,6 +376,12 @@ Current WPF/Python POC:
 - Search latency is visible in WPF after each query.
 - Benchmark average and P95 latency are visible in WPF.
 - TurboVec index and SQLite metadata persist between Python sidecar runs.
+
+Optional WPF/Rust search flow:
+
+- WPF can route search and benchmark requests to a named Rust collection.
+- WPF disables Python ingest controls while Rust search mode is enabled.
+- Query embeddings come from the Python sidecar and vector search results come from the Rust sidecar.
 
 Standalone Rust sidecar:
 
@@ -429,8 +445,8 @@ If future TurboVec deletion semantics change or a crash leaves stale vectors in 
 ## Notes
 
 - No LLM/chat layer in v1.
-- The WPF app currently talks to the Python sidecar, not the Rust sidecar.
-- The Rust sidecar is ready for future C# integration but does not change current WPF behavior.
+- The WPF app uses the Python sidecar by default and can optionally route search/benchmark calls to the Rust sidecar.
+- WPF ingest remains Python-sidecar only; Rust mode disables ingest controls.
 - The Python sidecar accesses TurboVec today.
 - The Rust sidecar currently defaults to the in-memory engine; future TurboVec replacement work should happen behind the existing engine trait.
 - Benchmark timings in the WPF app measure TurboVec search latency after query embedding is prepared and do not include embedding model load time.

@@ -1,10 +1,10 @@
 # Rust Sidecar Architecture
 
-The Rust sidecar is intentionally isolated from the WPF application. It exposes a stable local HTTP JSON API that a future C# provider can call when the app adds a sidecar selection option.
+The Rust sidecar is a standalone HTTP JSON service that remains process-isolated from the WPF application. The WPF app can optionally call it for search/benchmark through the **Use Rust sidecar** toggle, while Python-sidecar ingest remains separate.
 
 ```mermaid
 flowchart LR
-    A[C# WPF App] --> B[RustSidecarVectorIndexProvider future]
+    A[C# WPF App] --> B[Use Rust sidecar toggle]
     B --> C[HTTP JSON]
     C --> D[Rust Sidecar]
     D --> E[VectorIndexEngine trait]

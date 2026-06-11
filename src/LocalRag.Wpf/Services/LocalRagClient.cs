@@ -30,6 +30,9 @@ public sealed class LocalRagClient
     public Task<SearchResponse> SearchAsync(SearchRequest request, CancellationToken cancellationToken = default) =>
         SendPostAsync<SearchRequest, SearchResponse>("search", request, cancellationToken);
 
+    public Task<EmbedResponse> EmbedAsync(EmbedRequest request, CancellationToken cancellationToken = default) =>
+        SendPostAsync<EmbedRequest, EmbedResponse>("embed", request, cancellationToken);
+
     public Task<BenchmarkResponse> BenchmarkAsync(BenchmarkRequest request, CancellationToken cancellationToken = default) =>
         SendPostAsync<BenchmarkRequest, BenchmarkResponse>("benchmark", request, cancellationToken);
 
