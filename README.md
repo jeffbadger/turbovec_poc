@@ -15,7 +15,7 @@ There is intentionally **no LLM/chat layer** in v1. The current WPF flow proves 
 | Component | Path | Status | Default URL | Notes |
 | --- | --- | --- | --- | --- |
 | WPF app | `src/LocalRag.Wpf` | Existing app | n/a | Runs on Windows with .NET 8. |
-| Python sidecar | `sidecar` | Used by the WPF app today | `http://localhost:8008` | Handles ingest, embeddings, SQLite metadata, and TurboVec vector search. |
+| Python sidecar | `src/python-sidecar` | Used by the WPF app today | `http://localhost:8008` | Handles ingest, embeddings, SQLite metadata, and TurboVec vector search. |
 | Rust sidecar | `src/turbovec-sidecar` | Standalone, future integration target | `http://127.0.0.1:43187` | Owns local vector collections over HTTP JSON; WPF does **not** call it yet. |
 
 ## Repository layout
@@ -32,6 +32,12 @@ src/
       RagDtos.cs
     Services/
       LocalRagClient.cs
+  python-sidecar/
+    app.py
+    requirements.txt
+    README.md
+    rag_store/
+      .gitkeep
   turbovec-sidecar/
     Cargo.toml
     README.md
@@ -46,11 +52,6 @@ src/
       math/
       persistence/
     tests/
-sidecar/
-  app.py
-  requirements.txt
-  rag_store/
-    .gitkeep
 docs/
   rust-sidecar-api.md
   rust-sidecar-architecture.md
@@ -97,8 +98,8 @@ Windows PowerShell:
 cd C:\path\to\LocalRagPoc
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r sidecar\requirements.txt
-cd sidecar
+pip install -r src\python-sidecar\requirements.txt
+cd src\python-sidecar
 uvicorn app:app --host 127.0.0.1 --port 8008
 ```
 
@@ -108,8 +109,8 @@ macOS/Linux shell, for sidecar-only testing:
 cd /path/to/LocalRagPoc
 python -m venv .venv
 source .venv/bin/activate
-pip install -r sidecar/requirements.txt
-cd sidecar
+pip install -r src/python-sidecar/requirements.txt
+cd src/python-sidecar
 uvicorn app:app --host 127.0.0.1 --port 8008
 ```
 
@@ -301,16 +302,17 @@ curl -X DELETE http://127.0.0.1:43187/collections/scenario-001-small
 - No production index compaction.
 - TurboVec integration is currently a placeholder behind the `turbovec` Cargo feature while the real Rust engine mapping/persistence design is finalized.
 
-### Rust sidecar docs
+### Sidecar docs
 
-- API contract: `docs/rust-sidecar-api.md`
+- Rust API contract: `docs/rust-sidecar-api.md`
 - Architecture: `docs/rust-sidecar-architecture.md`
 - TurboVec integration notes: `docs/turbovec-integration-notes.md`
-- Sidecar-specific README: `src/turbovec-sidecar/README.md`
+- Python sidecar README: `src/python-sidecar/README.md`
+- Rust sidecar README: `src/turbovec-sidecar/README.md`
 
 ## Common run issues
 
-- **`uvicorn` is not recognized**: activate the Python virtual environment first, then rerun `pip install -r sidecar/requirements.txt`.
+- **`uvicorn` is not recognized**: activate the Python virtual environment first, then rerun `pip install -r src/python-sidecar/requirements.txt`.
 - **WPF cannot connect / sidecar request failed**: make sure Terminal 1 is still running `uvicorn` on port `8008`.
 - **PowerShell blocks activation**: run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`, then activate `.\.venv\Scripts\Activate.ps1` again.
 - **First search or ingest is slow**: the embedding model loads lazily and may download on first use.
@@ -347,11 +349,11 @@ $env:SENTENCE_TRANSFORMERS_HOME = "C:\models\sentence-transformers-cache"
 uvicorn app:app --host 127.0.0.1 --port 8008
 ```
 
-If the machine cannot access Hugging Face, pre-download the model on a machine with internet access and either copy it into the configured cache directory or change `EMBEDDING_MODEL` in `sidecar/app.py` to a local model folder path.
+If the machine cannot access Hugging Face, pre-download the model on a machine with internet access and either copy it into the configured cache directory or change `EMBEDDING_MODEL` in `src/python-sidecar/app.py` to a local model folder path.
 
 LM Studio is **not used by this version**. You can keep using LM Studio for chat models, but this POC does not call LM Studio for embeddings or chat.
 
-If you want LM Studio to serve embeddings instead, that is a separate follow-up change: replace the `SentenceTransformer` path in `sidecar/app.py` with HTTP calls to LM Studio's OpenAI-compatible embeddings endpoint, usually something like `http://localhost:1234/v1/embeddings`, and load an embedding-capable model in LM Studio. Make sure the embedding model dimension matches the TurboVec index dimension. This POC currently assumes `384` dimensions, so using a different LM Studio embedding model would also require updating `VECTOR_DIMENSION` and rebuilding the TurboVec index.
+If you want LM Studio to serve embeddings instead, that is a separate follow-up change: replace the `SentenceTransformer` path in `src/python-sidecar/app.py` with HTTP calls to LM Studio's OpenAI-compatible embeddings endpoint, usually something like `http://localhost:1234/v1/embeddings`, and load an embedding-capable model in LM Studio. Make sure the embedding model dimension matches the TurboVec index dimension. This POC currently assumes `384` dimensions, so using a different LM Studio embedding model would also require updating `VECTOR_DIMENSION` and rebuilding the TurboVec index.
 
 ## POC success criteria
 
@@ -388,8 +390,8 @@ The Rust sidecar does not discover files; callers provide vector records and met
 
 ### Python sidecar storage
 
-- SQLite metadata and chunk text: `sidecar/rag_store/metadata.db`
-- TurboVec vector index: `sidecar/rag_store/index.tvim`
+- SQLite metadata and chunk text: `src/python-sidecar/rag_store/metadata.db`
+- TurboVec vector index: `src/python-sidecar/rag_store/index.tvim`
 - Embedding model: `BAAI/bge-small-en-v1.5`
 - Vector dimension: `384`
 - TurboVec index: `IdMapIndex(dim=384, bit_width=4)`

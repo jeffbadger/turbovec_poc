@@ -2,6 +2,10 @@
 
 Standalone Rust HTTP sidecar for local vector collection storage and cosine-similarity search. This service is isolated from the WPF app and does not require Python, pip, conda, virtual environments, Docker, or administrator rights.
 
+## Related sidecar
+
+The current WPF app still uses the Python FastAPI sidecar at `../python-sidecar`. This Rust service is standalone and intended for future WPF integration.
+
 ## Prerequisites
 
 - Rust stable (`rustup` or a standard Rust toolchain installation)
